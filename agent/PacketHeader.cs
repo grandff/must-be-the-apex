@@ -4,7 +4,7 @@ namespace MustBeTheApex.Agent;
 /// UDP 패킷 헤더 구조체
 /// F1 25 UDP 패킷의 공통 헤더 파싱용
 /// </summary>
-public struct PacketHeader
+public class PacketHeader
 {
     public ushort PacketFormat;      // 2024
     public byte GameMajorVersion;     // 게임 메이저 버전

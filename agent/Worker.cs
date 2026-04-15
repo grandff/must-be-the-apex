@@ -300,7 +300,7 @@ public class Worker : BackgroundService
     {
         try
         {
-            await _webSocketClient.SendTelemetryAsync(telemetry);
+            await _webSocketClient.SendTelemetryAsync(telemetry, CancellationToken.None);
         }
         catch (Exception ex)
         {

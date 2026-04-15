@@ -31,7 +31,10 @@
 - [ ] **3.3.2** 로컬 IP(예: 192.168.x.x:3000)를 가리키는 QR 코드 생성 컴포넌트 작성 및 노출
 
 ## Phase 4: AI 레이스 엔지니어 연동 (AI Pipeline - Web Server)
-- [ ] **4.1.1** 트랙 ID별 코너 진입/탈출 구간(`lapDistance`) JSON 매핑 테이블 초안 작성 (예: 몬자 트랙)
+- [x] **4.1.1** 트랙 ID별 코너 진입/탈출 구간(`lapDistance`) JSON 매핑 테이블 초안 작성 (Jeddah, Miami) ✅ 2026-04-15
+  - 사우디아라비아 (ID 1): 17개 코너 매핑
+  - 마이애미 (ID 2): 19개 코너 매핑
+  - `cornerMapping.ts` 위치: `web/app/lib/tracks/cornerMapping.ts`
 - [ ] **4.1.2** Remix 서버에서 현재 `lapDistance`를 바탕으로 Turn 번호 태깅 로직 구현
 - [ ] **4.2.1** 한 랩 종료 시점(`lap_completed` 이벤트) 판단 로직 구현
 - [ ] **4.2.2** 베스트 랩과 현재 랩의 코너별 진입 속도/브레이킹 포인트 차이(Delta) 연산 함수 작성

@@ -1,0 +1,16 @@
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/appsettings.Development.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/appsettings.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/mock-agent/node_modules/.package-lock.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/mock-agent/node_modules/ws/package.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/mock-agent/package-lock.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/mock-agent/package.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/publish/appsettings.Development.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/publish/appsettings.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/publish/mock-agent/node_modules/.package-lock.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/publish/mock-agent/node_modules/ws/package.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/publish/mock-agent/package-lock.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/publish/mock-agent/package.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/publish/MustBeTheApex.Agent.deps.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/publish/MustBeTheApex.Agent.runtimeconfig.json
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/MustBeTheApex.Agent.pdb
+/Users/kimjeongmin/Devs/must-be-the-apex/agent/publish-single/MustBeTheApex.Agent.exe

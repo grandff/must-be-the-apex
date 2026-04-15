@@ -6,7 +6,7 @@ namespace MustBeTheApex.Agent;
 /// <summary>
 /// F1 25 UDP 패킷 헤더 및 개별 패킷 파서
 /// Reference: F1 25 UDP Spec (EAA)
-/ TODO: 실제 F1 25 패킷 구조 확인 필요
+/// TODO: 실제 F1 25 패킷 구조 확인 필요
 /// </summary>
 public static class PacketParser
 {
@@ -70,8 +70,8 @@ public static class PacketParser
         };
 
         // 세션 시간 포맷
-        session.SessionTimeLeftMs = session.SessionTimeLeft * 1000;
-        session.SessionDurationMs = session.SessionDuration * 1000;
+        session.SessionTimeLeftMs = (int)(session.SessionTimeLeft * 1000);
+        session.SessionDurationMs = (int)(session.SessionDuration * 1000);
 
         return session;
     }
@@ -117,7 +117,7 @@ public static class PacketParser
                 Penalties = reader.ReadByte(),                                                      // 30
                 AccumulatedTimeMs = reader.ReadUInt32(),                                           // 31-34
                 UnclearedPenalties = reader.ReadByte(),                                             // 35
-                ... reader.ReadBytes(7) // 패딩/예약
+                Reserved = reader.ReadBytes(7) // 패딩/예약
             };
 
             // Invalid Lap Flags 파싱
@@ -172,21 +172,7 @@ public static class PacketParser
                 ThrottlePct = reader.ReadByte(),                          // 19 (Throttle Pedal Pressed %)
                 BrakePct = reader.ReadByte(),                             // 20 (Brake Pedal Pressed %)
                 DRS = reader.ReadByte() == 1,                             // 21
-                // Brake bias (22), as it was removed in 2025 spec but keep for compatibility
             };
-
-            // Brake Pedal Position (0-100%)
-            carTelemetry.BrakePedalPct = carTelemetry.BrakePct / 2.55f; // Convert from 255 to 0-100
-
-            // Remaining telemetry fields
-            carTelemetry.ThrottlePct /= 2.55f; // Convert from 255 to 0-100%
-
-            // Writable rear wing? (ERS deployment)
-            // Actually in F1 25 it's not in telemetry, but in car status
-            // We'll add later as needed
-
-            // Tyre pressures (new in F1 25 - might be in separate packet)
-            // For now we'll use car status for tyre data
 
             packet.CarTelemetryArray[i] = carTelemetry;
         }
@@ -304,10 +290,12 @@ public class LapData
     public PitStatus PitStatus { get; set; }
     public byte NumPitStops { get; set; }
     public Sector Sector { get; set; }
+    public bool CurrentLapInvalid { get; set; }
     public bool LapInvalidated { get; set; }
     public byte Penalties { get; set; }
     public uint AccumulatedTimeMs { get; set; }
     public byte UnclearedPenalties { get; set; }
+    public byte[] Reserved { get; set; } = new byte[7];
     public bool Sector1TimeValid { get; set; }
     public bool Sector2TimeValid { get; set; }
 }
@@ -332,8 +320,8 @@ public class CarTelemetryData
     public sbyte Gear { get; set; }               // -1=invalid, 0=N, 1=R, 2-8=Gears
     public ushort EngineRPM { get; set; }         // RPM
     public byte Drsz { get; set; }               // DRSactivated? (0-20 typically)
-    public float ThrottlePct { get; set; }         // 0-100%
-    public float BrakePedalPct { get; set; }      // 0-100%
+    public byte ThrottlePct { get; set; }        // Throttle Pedal Pressed % (0-100)
+    public byte BrakePct { get; set; }            // Brake Pedal Pressed % (0-100)
     public bool DRS { get; set; }
 }
 
@@ -418,8 +406,7 @@ public enum TyreCompound : byte
     Inter = 6,
     Wet = 7,
     Classic = 8,
-    Dry = 9,
-    Wet = 10
+    Dry = 9
 }
 
 public enum FIAFlag : short

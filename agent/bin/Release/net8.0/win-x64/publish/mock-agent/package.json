@@ -1,0 +1,13 @@
+{
+  "name": "must-be-the-apex-mock-agent",
+  "version": "1.0.0",
+  "description": "Mock F1 25 telemetry data generator for testing on Mac",
+  "main": "mock-agent.js",
+  "type": "module",
+  "scripts": {
+    "start": "node mock-agent.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}
