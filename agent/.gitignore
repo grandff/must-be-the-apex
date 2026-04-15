@@ -1,0 +1,18 @@
+# Build outputs
+bin/
+obj/
+publish-single/
+publish/
+
+# Portable zip (keep the source exe in git if needed)
+*.zip
+
+# Settings (contain local config)
+appsettings.json
+appsettings.Development.json
+
+# PDB (debug symbols, optional)
+*.pdb
+
+# macOS
+.DS_Store

@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  # Web + WebSocket Server
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - WS_PORT=3001
+      - WS_HOST=0.0.0.0
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    networks:
+      - apex-network
+
+  # SQLite DB는 Web 서버에 내장 (better-sqlite3)
+
+networks:
+  apex-network:
+    driver: bridge
