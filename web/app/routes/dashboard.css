@@ -1,0 +1,450 @@
+/* ===========================================
+   Must Be The Apex - Dashboard Styles
+   Deep Dark Mode + Claymorphism Design
+   =========================================== */
+
+/* CSS Variables (Design System) */
+:root {
+  --bg-base: #0F0F13;
+  --bg-surface: #1C1C21;
+  --primary: #8400FF;
+  --ai-highlight: #DC6075;
+  --text-primary: rgba(255, 255, 255, 0.87);
+  --text-secondary: #A0A0A5;
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* Reset & Base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Dashboard Layout */
+.dashboard {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.app-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.track-name {
+  font-size: 14px;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+/* Connection Badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.badge-connected {
+  background: rgba(76, 175, 80, 0.15);
+  color: #4CAF50;
+}
+
+.badge-connecting {
+  background: rgba(255, 193, 7, 0.15);
+  color: #FFC107;
+}
+
+.badge-disconnected {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+}
+
+.badge-error {
+  background: rgba(220, 96, 117, 0.15);
+  color: var(--ai-highlight);
+}
+
+/* Waiting Screen */
+.waiting-screen {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.waiting-content {
+  text-align: center;
+  max-width: 500px;
+}
+
+.f1-car-icon {
+  font-size: 64px;
+  margin-bottom: 24px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.waiting-content h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.waiting-content p {
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+}
+
+.instructions {
+  text-align: left;
+  background: var(--bg-surface);
+  padding: 24px;
+  border-radius: 12px;
+}
+
+.instructions h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+}
+
+.instructions ol {
+  padding-left: 20px;
+}
+
+.instructions li {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.instructions code {
+  background: rgba(132, 0, 255, 0.15);
+  color: var(--primary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* Telemetry Grid */
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding: 24px;
+  flex: 1;
+}
+
+/* Panel Base */
+.panel {
+  background: var(--bg-surface);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Speed Panel */
+.speed-panel {
+  grid-column: span 1;
+}
+
+.speed-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.speed-number {
+  font-family: var(--font-mono);
+  font-size: 72px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.speed-unit {
+  font-size: 18px;
+  color: var(--text-secondary);
+  margin-left: 8px;
+}
+
+.speed-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.speed-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), #A855F7);
+  border-radius: 4px;
+  transition: width 0.1s ease-out;
+}
+
+/* Gear Panel */
+.gear-panel {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 24px;
+}
+
+.gear-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gear-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.gear-number {
+  font-family: var(--font-mono);
+  font-size: 64px;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.pedals {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+}
+
+.pedal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: 120px;
+}
+
+.pedal-bar {
+  width: 40px;
+  border-radius: 8px;
+  transition: height 0.1s ease-out;
+}
+
+.throttle .pedal-bar {
+  background: linear-gradient(0deg, #4CAF50, #8BC34A);
+  height: 60%; /* 예시 */
+}
+
+.brake .pedal-bar {
+  background: linear-gradient(0deg, #F44336, #FF5722);
+  height: 0%; /* 예시 */
+}
+
+.pedal-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Lap Panel */
+.lap-panel {
+  grid-column: span 1;
+}
+
+.lap-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.lap-number {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.lap-distance {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  color: var(--primary);
+}
+
+.lap-progress {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.lap-progress-bar {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.1s ease-out;
+}
+
+/* Minimap Panel */
+.minimap-panel {
+  grid-column: span 2;
+}
+
+.minimap-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.track-map {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.car-marker {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: var(--primary);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 12px var(--primary);
+  transition: left 0.1s ease-out, top 0.1s ease-out;
+}
+
+.minimap-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+/* Tyres Panel */
+.tyres-panel {
+  grid-column: span 1;
+}
+
+.tyre-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  flex: 1;
+}
+
+.tyre {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+}
+
+.tyre-temp {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.tyre-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* Lap Completed Toast */
+.lap-completed-toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-surface);
+  border: 1px solid var(--primary);
+  border-radius: 12px;
+  padding: 16px 24px;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toast-icon {
+  font-size: 24px;
+}
+
+.toast-text {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .telemetry-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .minimap-panel {
+    grid-column: span 1;
+  }
+  
+  .speed-number {
+    font-size: 56px;
+  }
+}
