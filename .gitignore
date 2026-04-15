@@ -1,0 +1,42 @@
+# ============================================
+# Must Be The Apex - Root .gitignore
+# ============================================
+
+# ---------- C# Agent ----------
+/agent/bin/
+/agent/obj/
+/agent/publish/
+/agent/publish-single/
+
+# Portable zip (upload to GitHub Release, not git)
+*.zip
+
+# Settings (local config, machine-specific)
+/agent/appsettings.json
+/agent/appsettings.Development.json
+
+# PDB (optional)
+/agent/*.pdb
+
+# ---------- Web / Mock-Agent ----------
+/web/node_modules/
+/web/build/
+/web/.react-router/
+/web/.env
+
+/agent/mock-agent/node_modules/
+
+# ---------- macOS ----------
+.DS_Store
+
+# ---------- Logs / Data ----------
+# 텔레메트리 데이터 (게임 세션마다 생성됨)
+*.log
+telemetry_data/
+
+# ---------- IDE / OS ----------
+.vs/
+.vscode/
+*.user
+*.suo
+Thumbs.db

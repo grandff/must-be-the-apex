@@ -5,12 +5,14 @@ on:
     branches:
       - main
     paths:
-      - 'agent/csharp/**'
+      - 'agent/**'
+      - '.github/workflows/build-agent.yml'
   pull_request:
     branches:
       - main
     paths:
-      - 'agent/csharp/**'
+      - 'agent/**'
+      - '.github/workflows/build-agent.yml'
 
 permissions:
   contents: read
@@ -29,23 +31,33 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        working-directory: agent/csharp
+        working-directory: agent
         run: dotnet restore
 
       - name: Build
-        working-directory: agent/csharp
+        working-directory: agent
         run: dotnet build -c Release --no-restore
 
-      - name: Publish
-        working-directory: agent/csharp
+      - name: Publish (Portable)
+        working-directory: agent
         run: |
-          dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ../../publish/agent
+          dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ./publish
+
+      - name: Create Portable Folder
+        working-directory: agent/publish
+        shell: pwsh
+        run: |
+          # Create portable folder with only exe + settings
+          New-Item -ItemType Directory -Path ../portable -Force | Out-Null
+          Copy-Item MustBeTheApex.Agent.exe ../portable/
+          Copy-Item appsettings.json ../portable/
+          Copy-Item appsettings.Development.json ../portable/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: agent-win-x64
-          path: publish/agent/
+          name: agent-win-x64-portable
+          path: agent/portable/
           if-no-files-found: error
 
   release:
@@ -57,13 +69,45 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: agent-win-x64
+          name: agent-win-x64-portable
           path: agent
 
+      - name: Create Zip
+        working-directory: agent
+        shell: bash
+        run: |
+          cd portable
+          zip -r ../MustBeTheApex.Agent-win-x64.zip .
+          cd ..
+          ls -lh MustBeTheApex.Agent-win-x64.zip
+
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          files: agent/**/*
+          files: agent/MustBeTheApex.Agent-win-x64.zip
           generate_release_notes: true
+          name: MustBeTheApex Agent v1.0.0
+          body: |
+            ## Must Be The Apex - F1 25 Agent
+
+            Windows용 포터블 실행 파일입니다.
+
+            ### 사용법
+            ```
+            # 압축 해제 후 실행 (기본 설정)
+            MustBeTheApex.Agent.exe
+
+            # UDP 포트 변경
+            MustBeTheApex.Agent.exe --port 20780
+
+            # 데이터 저장 경로 변경
+            MustBeTheApex.Agent.exe --data-path D:\Telemetry
+
+            # 둘 다 변경
+            MustBeTheApex.Agent.exe --port 20780 --data-path D:\Telemetry
+            ```
+
+            ### 설정 파일
+            `appsettings.json`을 직접 수정해도 됩니다. CLI 인자가 우선합니다.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
