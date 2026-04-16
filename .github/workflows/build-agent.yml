@@ -3,13 +3,13 @@ name: Build and Publish Agent
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - 'agent/**'
       - '.github/workflows/build-agent.yml'
   pull_request:
     branches:
-      - main
+      - master
     paths:
       - 'agent/**'
       - '.github/workflows/build-agent.yml'
@@ -63,7 +63,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     
     steps:
       - name: Download Artifacts
