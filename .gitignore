@@ -9,7 +9,7 @@
 /agent/publish-single/
 
 # Portable zip (upload to GitHub Release, not git)
-*.zip
+#*.zip
 
 # Settings (local config, machine-specific)
 /agent/appsettings.json

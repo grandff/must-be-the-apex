@@ -5,7 +5,8 @@ publish-single/
 publish/
 
 # Portable zip (keep the source exe in git if needed)
-*.zip
+#*.zip
+*.exe
 
 # Settings (contain local config)
 appsettings.json

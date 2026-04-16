@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("F1 25 UDP 텔레메트리 수집 및 WebSocket 전송 에이전트")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b0ff5a2f484b54fb4ff53233a381c7981dbb1631")]
 [assembly: System.Reflection.AssemblyProductAttribute("MustBeTheApex.Agent")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MustBeTheApex.Agent")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
