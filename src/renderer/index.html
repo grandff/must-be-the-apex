@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Must Be The Apex - Telemetry Recorder</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header with only Connection Status -->
+    <header class="app-header">
+      <div class="logo-area">
+        <span class="logo-icon">🏎️</span>
+        <h1>MUST BE THE APEX</h1>
+      </div>
+      
+      <div id="connection-banner" class="status-banner disconnected">
+        <span class="status-indicator"></span>
+        <span id="connection-text">DISCONNECTED</span>
+      </div>
+    </header>
+
+    <!-- Main Content Panel (Minimal) -->
+    <main class="main-panel">
+      <!-- Recording Status Indicator -->
+      <div class="recording-status-box">
+        <span id="recording-indicator" class="recording-dot"></span>
+        <span id="recording-text">iRacing 연결 대기 중...</span>
+      </div>
+
+      <!-- Session Info Banner -->
+      <div class="session-info-bar">
+        <span class="info-label">TRACK:</span> <span id="info-track" class="info-value">-</span>
+        <span class="info-divider">|</span>
+        <span class="info-label">CAR:</span> <span id="info-car" class="info-value">-</span>
+      </div>
+
+      <!-- Download Panel -->
+      <div class="download-section">
+        <div class="download-header">
+          <h3>Saved Telemetry Logs</h3>
+          <button id="btn-clear" class="btn-clear">Clear All</button>
+        </div>
+
+        <!-- This list will contain dynamically populated laps -->
+        <div id="laps-container" class="laps-container">
+          <div class="no-laps-message">기록된 랩 데이터가 없습니다. 트랙 주행을 시작하세요.</div>
+        </div>
+      </div>
+
+      <!-- Notification Toast -->
+      <div id="toast" class="toast hidden"></div>
+    </main>
+  </div>
+
+  <script src="ui-controller.js"></script>
+</body>
+</html>

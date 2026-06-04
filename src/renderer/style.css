@@ -1,0 +1,406 @@
+/* Import Formula 1 Fonts */
+@font-face {
+  font-family: 'Formula1';
+  src: url('https://fonts.cdnfonts.com/s/19717/Formula1-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Formula1';
+  src: url('https://fonts.cdnfonts.com/s/19717/Formula1-Bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Formula1-Wide';
+  src: url('https://fonts.cdnfonts.com/s/19717/Formula1-Wide.woff') format('woff');
+  font-weight: 800;
+  font-style: normal;
+}
+
+/* CSS Reset & Variables */
+:root {
+  --bg-darker: #090b0e;
+  --bg-dark: #10141d;
+  --bg-panel: #161c28;
+  --border-color: #242c3e;
+  
+  --text-primary: #f0f4f8;
+  --text-secondary: #7e8f9f;
+  
+  --accent-cyan: #ff1801; /* F1 Neon Red/Orange accent */
+  --accent-cyan-glow: rgba(255, 24, 1, 0.2);
+  --accent-green: #00ff87;
+  --accent-red: #ff1801;
+  
+  --font-main: 'Formula1', sans-serif;
+  --font-header: 'Formula1-Wide', sans-serif;
+  --transition-smooth: all 0.2s ease-in-out;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--bg-darker);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* App Container */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 24px;
+}
+
+/* Header */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-icon {
+  font-size: 22px;
+}
+
+.app-header h1 {
+  font-family: var(--font-header);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+}
+
+/* Connection Status Banner */
+.status-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  border: 1px solid transparent;
+}
+
+.status-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.status-banner.connected {
+  background-color: rgba(0, 255, 135, 0.06);
+  border-color: rgba(0, 255, 135, 0.25);
+  color: var(--accent-green);
+}
+
+.status-banner.connected .status-indicator {
+  background-color: var(--accent-green);
+}
+
+.status-banner.disconnected {
+  background-color: rgba(255, 24, 1, 0.06);
+  border-color: rgba(255, 24, 1, 0.25);
+  color: var(--accent-red);
+}
+
+.status-banner.disconnected .status-indicator {
+  background-color: var(--accent-red);
+}
+
+/* Main Panel */
+.main-panel {
+  flex: 1;
+  background-color: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 0;
+}
+
+/* Recording Status Box */
+.recording-status-box {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.recording-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #4e5a70;
+  transition: var(--transition-smooth);
+}
+
+.recording-status-box.active .recording-dot {
+  background-color: var(--accent-red);
+  animation: recording-pulse 1.2s infinite ease-in-out;
+  box-shadow: 0 0 8px rgba(255, 24, 1, 0.5);
+}
+
+#recording-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+.recording-status-box.active #recording-text {
+  color: var(--text-primary);
+}
+
+/* Session Info Bar */
+.session-info-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background-color: rgba(255, 255, 255, 0.01);
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px dashed var(--border-color);
+  margin: 15px 0;
+  letter-spacing: 0.5px;
+}
+
+.info-label {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.info-value {
+  color: var(--text-primary);
+  font-weight: 400;
+}
+
+.info-divider {
+  color: var(--border-color);
+}
+
+/* Download Section */
+.download-section {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.download-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+}
+
+.download-header h3 {
+  font-family: var(--font-header);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+.btn-clear {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-main);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: var(--transition-smooth);
+}
+
+.btn-clear:hover {
+  color: var(--accent-red);
+  background-color: rgba(255, 24, 1, 0.05);
+}
+
+/* Laps Container */
+.laps-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.no-laps-message {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 30px 0;
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+  background-color: rgba(255,255,255,0.01);
+}
+
+.lap-row {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: var(--transition-smooth);
+}
+
+.lap-row:hover {
+  border-color: #3b4868;
+}
+
+.lap-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lap-session-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+
+.badge-practice {
+  background-color: rgba(0, 242, 254, 0.08);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(0, 242, 254, 0.2);
+}
+
+.badge-qualify {
+  background-color: rgba(255, 235, 59, 0.08);
+  color: #ffeb3b;
+  border: 1px solid rgba(255, 235, 59, 0.2);
+}
+
+.badge-race {
+  background-color: rgba(255, 24, 1, 0.08);
+  color: var(--accent-red);
+  border: 1px solid rgba(255, 24, 1, 0.2);
+}
+
+.lap-title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lap-status-active {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--accent-red);
+  background-color: rgba(255, 24, 1, 0.1);
+  padding: 2px 4px;
+  border-radius: 3px;
+  margin-left: 6px;
+  animation: blink 1s infinite ease-in-out;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.btn-download {
+  font-family: var(--font-main);
+  font-weight: 700;
+  font-size: 11px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--accent-cyan);
+  background-color: transparent;
+  color: var(--accent-cyan);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-download:hover:not(:disabled) {
+  background-color: var(--accent-cyan);
+  color: var(--text-primary);
+  box-shadow: 0 0 8px var(--accent-cyan-glow);
+}
+
+.btn-download:disabled {
+  border-color: var(--border-color);
+  color: #4e5a70;
+  background: none;
+  cursor: not-allowed;
+}
+
+/* Toast Notification */
+.toast {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--bg-panel);
+  border: 1px solid var(--accent-green);
+  color: var(--text-primary);
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 11px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+  z-index: 100;
+  transition: var(--transition-smooth);
+}
+
+.toast.error {
+  border-color: var(--accent-red);
+}
+
+.toast.hidden {
+  opacity: 0;
+  transform: translate(-50%, 10px);
+  pointer-events: none;
+}
+
+/* Animations */
+@keyframes recording-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.5;
+  }
+}
