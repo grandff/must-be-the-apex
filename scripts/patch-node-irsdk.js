@@ -4,6 +4,7 @@ const path = require('path');
 const projectRoot = path.join(__dirname, '..');
 const gypFile = path.join(projectRoot, 'node_modules', 'node-irsdk', 'binding.gyp');
 const hFile = path.join(projectRoot, 'node_modules', 'node-irsdk', 'src', 'cpp', 'IrSdkNodeBindings.h');
+const helpersFile = path.join(projectRoot, 'node_modules', 'node-irsdk', 'src', 'cpp', 'IrSdkBindingHelpers.cpp');
 
 console.log('Running node-irsdk patcher...');
 
@@ -35,4 +36,19 @@ if (fs.existsSync(hFile)) {
   console.log('Warning: IrSdkNodeBindings.h not found.');
 }
 
+// 3. Patch IrSdkBindingHelpers.cpp to replace arr->Set with Nan::Set
+if (fs.existsSync(helpersFile)) {
+  let content = fs.readFileSync(helpersFile, 'utf8');
+  if (content.includes('arr->Set(i, convertTelemetryValueToObject(var, i));')) {
+    content = content.replace('arr->Set(i, convertTelemetryValueToObject(var, i));', 'Nan::Set(arr, i, convertTelemetryValueToObject(var, i));');
+    fs.writeFileSync(helpersFile, content, 'utf8');
+    console.log('Success: Replaced arr->Set with Nan::Set in IrSdkBindingHelpers.cpp');
+  } else {
+    console.log('Info: arr->Set is already updated or not found. Skipping.');
+  }
+} else {
+  console.log('Warning: IrSdkBindingHelpers.cpp not found.');
+}
+
 console.log('node-irsdk patcher finished.');
+
