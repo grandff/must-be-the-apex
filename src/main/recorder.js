@@ -87,7 +87,47 @@ class TelemetryRecorder {
     this.lapFrames[id] = this.activeLap.frames;
     
     console.log(`Saved lap: ${this.activeLap.sessionType} - Lap ${this.activeLap.lapNumber} (${this.activeLap.frames.length} frames).`);
+    
+    // Silent background auto-save to local disk (no UI dialog needed)
+    this.autoSaveLapCSV(id);
   }
+
+  autoSaveLapCSV(lapId) {
+    const { app } = require('electron');
+    const path = require('path');
+    
+    let frames = this.lapFrames[lapId];
+    if (!frames || frames.length === 0) return;
+
+    const lapMeta = this.completedLaps.find(l => l.id === lapId) || 
+                    (this.activeLap.id === lapId ? this.activeLap : null);
+    const sessionName = lapMeta ? lapMeta.sessionType : 'Session';
+    const lapNum = lapMeta ? lapMeta.lapNumber : 0;
+
+    try {
+      const autoSaveDir = path.join(app.getPath('documents'), 'MustBeTheApex', 'Telemetry');
+      if (!fs.existsSync(autoSaveDir)) {
+        fs.mkdirSync(autoSaveDir, { recursive: true });
+      }
+
+      const filename = `telemetry_${sessionName.toLowerCase()}_lap_${lapNum}_${Date.now()}.csv`;
+      const filePath = path.join(autoSaveDir, filename);
+
+      const headers = ['SessionTime', 'LapDist', 'Speed', 'Throttle', 'Brake', 'Gear', 'Steering', 'RPM'];
+      let csvContent = headers.join(',') + '\n';
+      
+      const lines = frames.map(f => 
+        `${f.sessionTime.toFixed(3)},${f.lapDist.toFixed(2)},${f.speed.toFixed(2)},${f.throttle.toFixed(4)},${f.brake.toFixed(4)},${f.gear},${f.steering.toFixed(4)},${Math.round(f.rpm)}`
+      );
+      csvContent += lines.join('\n') + '\n';
+
+      fs.writeFileSync(filePath, csvContent, 'utf-8');
+      console.log(`[Auto-Save] Successfully saved telemetry to: ${filePath}`);
+    } catch (err) {
+      console.error(`[Auto-Save] Failed to auto-save CSV file for lap ${lapId}:`, err);
+    }
+  }
+
 
   getLapsList() {
     const list = [...this.completedLaps];
