@@ -19,8 +19,14 @@ jobs:
           node-version: 20.x
           cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm ci
+      - name: Install Dependencies (ignore scripts)
+        run: npm ci --ignore-scripts
+
+      - name: Strip UTF-8 BOM from node-irsdk binding.gyp
+        run: node -e "const fs = require('fs'); const file = 'node_modules/node-irsdk/binding.gyp'; if (fs.existsSync(file)) { let content = fs.readFileSync(file, 'utf8'); if (content.startsWith('\ufeff')) { fs.writeFileSync(file, content.replace(/^\ufeff/, ''), 'utf8'); console.log('BOM stripped successfully.'); } }"
+
+      - name: Rebuild Native Modules
+        run: npm rebuild
 
       - name: Build and Package Electron App
         run: npm run dist
