@@ -1,5 +1,8 @@
 name: Build Electron App
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
     tags:
@@ -22,8 +25,8 @@ jobs:
       - name: Install Dependencies (ignore scripts)
         run: npm ci --ignore-scripts
 
-      - name: Strip UTF-8 BOM from node-irsdk binding.gyp
-        run: node -e "const fs = require('fs'); const file = 'node_modules/node-irsdk/binding.gyp'; if (fs.existsSync(file)) { let content = fs.readFileSync(file, 'utf8'); if (content.startsWith('\ufeff')) { fs.writeFileSync(file, content.replace(/^\ufeff/, ''), 'utf8'); console.log('BOM stripped successfully.'); } }"
+      - name: Patch node-irsdk C++ files (BOM and AtExit signature)
+        run: node scripts/patch-node-irsdk.js
 
       - name: Rebuild Native Modules
         run: npm rebuild

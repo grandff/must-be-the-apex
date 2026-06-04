@@ -18,5 +18,8 @@
   },
   "dependencies": {
     "node-irsdk": "^2.1.6"
+  },
+  "overrides": {
+    "nan": "^2.22.0"
   }
 }
