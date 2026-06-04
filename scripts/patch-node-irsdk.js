@@ -25,9 +25,9 @@ if (fs.existsSync(gypFile)) {
 if (fs.existsSync(hFile)) {
   let content = fs.readFileSync(hFile, 'utf8');
   if (content.includes('node::AtExit(cleanUp);')) {
-    content = content.replace('node::AtExit(cleanUp);', 'node::AtExit(v8::Isolate::GetCurrent(), cleanUp);');
+    content = content.replace('node::AtExit(cleanUp);', 'node::AddEnvironmentCleanupHook(v8::Isolate::GetCurrent(), cleanUp, nullptr);');
     fs.writeFileSync(hFile, content, 'utf8');
-    console.log('Success: Updated node::AtExit signature in IrSdkNodeBindings.h');
+    console.log('Success: Replaced node::AtExit with node::AddEnvironmentCleanupHook in IrSdkNodeBindings.h');
   } else {
     console.log('Info: node::AtExit signature already updated or not found. Skipping.');
   }
