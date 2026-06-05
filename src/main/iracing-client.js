@@ -14,6 +14,23 @@ class IRacingClient extends EventEmitter {
     
     // We poll at 60Hz (approx 16.6ms)
     this.POLL_INTERVAL = 16; 
+    this.currentTrackLength = 4000; // Default fallback
+  }
+
+  parseTrackLength(lengthStr) {
+    if (!lengthStr) return 4000;
+    // Extract numbers and decimal point
+    const num = parseFloat(lengthStr.replace(/[^0-9.]/g, ''));
+    if (isNaN(num)) return 4000;
+    
+    const normalized = lengthStr.toLowerCase();
+    if (normalized.includes('km')) {
+      return Math.round(num * 1000);
+    }
+    if (normalized.includes('mile')) {
+      return Math.round(num * 1609.34);
+    }
+    return Math.round(num);
   }
 
   start() {
@@ -62,11 +79,13 @@ class IRacingClient extends EventEmitter {
         this.currentTrack = 'Unknown Track';
         this.currentCar = 'Unknown Car';
         this.currentSessionType = 'Practice';
+        this.currentTrackLength = 4000;
         this.emit('connection-status', false);
         this.emit('session-info', {
           track: this.currentTrack,
           car: this.currentCar,
-          sessionType: this.currentSessionType
+          sessionType: this.currentSessionType,
+          trackLength: this.currentTrackLength
         });
         logger.info('iRacing Disconnected.');
       });
@@ -83,6 +102,10 @@ class IRacingClient extends EventEmitter {
         this.currentTrack = track;
         this.currentCar = car;
 
+        // Parse track length
+        const rawTrackLength = data.WeekendInfo?.TrackLength || data.WeekendInfo?.TrackLengthOfficial;
+        this.currentTrackLength = this.parseTrackLength(rawTrackLength);
+
         // Determine session type if telemetry is already active
         const sessions = data.SessionInfo?.Sessions || [];
         if (this.currentSessionNum !== undefined && sessions[this.currentSessionNum]) {
@@ -92,7 +115,8 @@ class IRacingClient extends EventEmitter {
         this.emit('session-info', {
           track: this.currentTrack,
           car: this.currentCar,
-          sessionType: this.currentSessionType
+          sessionType: this.currentSessionType,
+          trackLength: this.currentTrackLength
         });
       });
 
@@ -150,13 +174,15 @@ class IRacingClient extends EventEmitter {
     this.currentTrack = 'Spa-Francorchamps (Mock GP)';
     this.currentCar = 'Porsche 911 GT3 R (Mock)';
     this.currentSessionType = 'Practice';
+    this.currentTrackLength = 7004;
 
     setTimeout(() => {
       this.emit('connection-status', true);
       this.emit('session-info', {
         track: this.currentTrack,
         car: this.currentCar,
-        sessionType: this.currentSessionType
+        sessionType: this.currentSessionType,
+        trackLength: this.currentTrackLength
       });
     }, 500);
 

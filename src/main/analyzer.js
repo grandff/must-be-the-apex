@@ -1,0 +1,379 @@
+const EventEmitter = require('events');
+const dbManager = require('./db-manager');
+
+class TelemetryAnalyzer extends EventEmitter {
+  constructor() {
+    super();
+    this.telemetryCache = [];
+    this.detectedCorners = [];
+    this.trackLength = 0;
+    this.currentTrack = '';
+    this.currentCar = '';
+    
+    // State machine tracking
+    this.prevLapDist = -1;
+    this.isPaused = false;
+    this.pausedDistAccumulator = 0;
+    
+    // Apex speed evaluation temporary tracking
+    // Key: cornerId, Value: min user speed observed in the window
+    this.cornerMinSpeeds = {};
+  }
+
+  // Load telemetry from DB, resample it, and extract corners
+  loadTrackTelemetry(trackName, carName, trackLength) {
+    this.currentTrack = trackName;
+    this.currentCar = carName;
+    this.trackLength = Math.round(trackLength);
+    this.telemetryCache = [];
+    this.detectedCorners = [];
+    this.prevLapDist = -1;
+    this.isPaused = false;
+    this.pausedDistAccumulator = 0;
+    this.cornerMinSpeeds = {};
+    
+    console.log(`[Analyzer] Loading telemetry for track="${trackName}" car="${carName}" trackLength=${trackLength}m`);
+    
+    const rawCsvData = dbManager.getReferenceTelemetry(trackName, carName);
+    if (!rawCsvData) {
+      console.warn(`[Analyzer] No reference telemetry found in SQLite for track=${trackName}, car=${carName}`);
+      this.emit('reference-missing', { trackName, carName });
+      return false;
+    }
+    
+    const success = this.parseAndResample(rawCsvData);
+    if (success) {
+      this.extractCorners();
+    }
+    return success;
+  }
+
+  // Parse G61 CSV and interpolate to 1m steps
+  parseAndResample(csvText) {
+    try {
+      const lines = csvText.trim().split('\n');
+      if (lines.length < 2) return false;
+      
+      const header = lines[0].split(',');
+      const speedIdx = header.indexOf('Speed');
+      const distPctIdx = header.indexOf('LapDistPct');
+      const brakeIdx = header.indexOf('Brake');
+      const throttleIdx = header.indexOf('Throttle');
+      const gearIdx = header.indexOf('Gear');
+      const steeringIdx = header.indexOf('SteeringWheelAngle');
+      
+      if (speedIdx === -1 || distPctIdx === -1 || brakeIdx === -1 || throttleIdx === -1) {
+        console.error('[Analyzer] CSV is missing essential columns.');
+        return false;
+      }
+      
+      const dataPoints = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].split(',');
+        if (row.length < header.length) continue;
+        
+        const distPct = parseFloat(row[distPctIdx]);
+        if (isNaN(distPct)) continue;
+        
+        const distMeters = distPct * this.trackLength;
+        const speed = parseFloat(row[speedIdx]) * 3.6; // convert m/s to km/h
+        const throttle = parseFloat(row[throttleIdx]);
+        const brake = parseFloat(row[brakeIdx]);
+        const gear = gearIdx !== -1 ? parseInt(row[gearIdx], 10) : 0;
+        const steering = steeringIdx !== -1 ? parseFloat(row[steeringIdx]) : 0;
+        
+        dataPoints.push({
+          dist: distMeters,
+          speed,
+          throttle,
+          brake,
+          gear,
+          steering
+        });
+      }
+      
+      if (dataPoints.length === 0) return false;
+      
+      // Sort data points by distance ascending
+      dataPoints.sort((a, b) => a.dist - b.dist);
+      
+      // Linear interpolation to fill telemetryCache at 1m resolution (0 to trackLength)
+      this.telemetryCache = new Array(this.trackLength + 1);
+      
+      let pIndex = 0;
+      for (let d = 0; d <= this.trackLength; d++) {
+        while (pIndex < dataPoints.length - 1 && dataPoints[pIndex + 1].dist <= d) {
+          pIndex++;
+        }
+        
+        const p1 = dataPoints[pIndex];
+        const p2 = dataPoints[pIndex + 1];
+        
+        if (p2) {
+          const denom = p2.dist - p1.dist;
+          const t = denom > 0.0001 ? (d - p1.dist) / denom : 0;
+          this.telemetryCache[d] = {
+            speed: p1.speed + t * (p2.speed - p1.speed),
+            throttle: p1.throttle + t * (p2.throttle - p1.throttle),
+            brake: p1.brake + t * (p2.brake - p1.brake),
+            steering: p1.steering + t * (p2.steering - p1.steering),
+            gear: t < 0.5 ? p1.gear : p2.gear
+          };
+        } else {
+          this.telemetryCache[d] = {
+            speed: p1.speed,
+            throttle: p1.throttle,
+            brake: p1.brake,
+            steering: p1.steering,
+            gear: p1.gear
+          };
+        }
+      }
+      
+      console.log(`[Analyzer] Successfully resampled telemetry cache to ${this.telemetryCache.length} meters.`);
+      return true;
+      
+    } catch (err) {
+      console.error('[Analyzer] Error during telemetry resampling:', err);
+      return false;
+    }
+  }
+
+  // Automatically detect corners from resampled reference telemetry
+  extractCorners() {
+    const k = 15; // window size for local minima search (15m)
+    const candidates = [];
+    
+    // 1. Find Local Minima (Apex candidates)
+    for (let d = k; d < this.trackLength - k; d++) {
+      const vCurr = this.telemetryCache[d].speed;
+      const vPrev = this.telemetryCache[d - k].speed;
+      const vNext = this.telemetryCache[d + k].speed;
+      
+      if (vPrev > vCurr && vCurr < vNext) {
+        candidates.push(d);
+      }
+    }
+    
+    // 2. Filter false positives & define corners
+    const validApexes = [];
+    for (const apex of candidates) {
+      // Look at window [apex - 20m, apex + 20m]
+      const startW = Math.max(0, apex - 20);
+      const endW = Math.min(this.trackLength, apex + 20);
+      
+      let maxBrake = 0;
+      let sumSteering = 0;
+      let count = 0;
+      
+      for (let w = startW; w <= endW; w++) {
+        const pt = this.telemetryCache[w];
+        if (pt.brake > maxBrake) maxBrake = pt.brake;
+        sumSteering += Math.abs(pt.steering);
+        count++;
+      }
+      
+      const avgSteering = count > 0 ? sumSteering / count : 0;
+      
+      // Filter: must have significant steering (> 0.10 rad) and some brake application (> 10% max brake)
+      if (avgSteering >= 0.10 && maxBrake >= 0.10) {
+        validApexes.push(apex);
+      }
+    }
+    
+    // 3. Find brake start distance for each valid apex & assemble corner objects
+    this.detectedCorners = [];
+    let cornerId = 1;
+    
+    for (const apex of validApexes) {
+      // Prevent duplicate corners that are too close (within 50m of the last registered corner)
+      if (this.detectedCorners.length > 0 && apex - this.detectedCorners[this.detectedCorners.length - 1].apexDist < 50) {
+        continue;
+      }
+      
+      // Scan backwards from apex up to 300m to find where brake pressure was >= 5%
+      let brakeStart = apex;
+      for (let d = apex; d >= Math.max(0, apex - 300); d--) {
+        if (this.telemetryCache[d].brake >= 0.05) {
+          brakeStart = d;
+        }
+      }
+      
+      // Calculate max brake in the entry zone
+      let targetBrakeMax = 0;
+      for (let d = brakeStart; d <= apex; d++) {
+        if (this.telemetryCache[d].brake > targetBrakeMax) {
+          targetBrakeMax = this.telemetryCache[d].brake;
+        }
+      }
+      
+      this.detectedCorners.push({
+        id: cornerId++,
+        brakeStartDist: brakeStart,
+        apexDist: apex,
+        targetGear: this.telemetryCache[apex].gear,
+        targetBrakeMax: targetBrakeMax,
+        state: 'INIT'
+      });
+    }
+    
+    console.log(`[Analyzer] Detected ${this.detectedCorners.length} corners on track:`);
+    this.detectedCorners.forEach(c => {
+      console.log(`  Corner #${c.id}: BrakeStart=${c.brakeStartDist}m, Apex=${c.apexDist}m, TargetGear=${c.targetGear}, MaxBrake=${(c.targetBrakeMax * 100).toFixed(0)}%`);
+    });
+  }
+
+  // Real-time loop updater called at 60Hz or throttled rate
+  updateTelemetry(userTelemetry) {
+    if (this.detectedCorners.length === 0 || !userTelemetry) return;
+    
+    const lapDist = Math.round(userTelemetry.lapDist);
+    const userSpeed = userTelemetry.speed * 3.6; // convert user speed to km/h
+    const userBrake = userTelemetry.brake;
+    
+    // 1. Handle new lap / reset
+    if (this.prevLapDist === -1 || lapDist < this.prevLapDist - 500) {
+      console.log('[Analyzer] New lap detected or telemetry reset. Resetting corner states.');
+      this.detectedCorners.forEach(c => c.state = 'INIT');
+      this.cornerMinSpeeds = {};
+      this.isPaused = false;
+      this.pausedDistAccumulator = 0;
+      this.prevLapDist = lapDist;
+      return;
+    }
+    
+    const deltaD = lapDist - this.prevLapDist;
+    
+    // 2. Exception Handling (Spin, course out, backward driving)
+    if (deltaD < 0) {
+      if (!this.isPaused) {
+        console.warn(`[Analyzer] Backward driving detected (deltaD=${deltaD}). Pausing state machine.`);
+        this.isPaused = true;
+        this.pausedDistAccumulator = 0;
+      }
+    } else if (Math.abs(deltaD) > 100) {
+      // Sudden teleport (towing, reset, etc.)
+      console.warn(`[Analyzer] Telemetry teleportation detected (deltaD=${deltaD}). Resetting.`);
+      this.detectedCorners.forEach(c => c.state = 'INIT');
+      this.cornerMinSpeeds = {};
+      this.isPaused = false;
+      this.pausedDistAccumulator = 0;
+    }
+    
+    // If paused, track how long they drive forward. Must drive 50m forward to resume.
+    if (this.isPaused) {
+      if (deltaD > 0) {
+        this.pausedDistAccumulator += deltaD;
+        if (this.pausedDistAccumulator >= 50) {
+          console.log('[Analyzer] Driver resumed normal forward racing. Reactivating state machine.');
+          this.isPaused = false;
+          this.pausedDistAccumulator = 0;
+        }
+      } else {
+        // Reset accumulator if they go backward again
+        this.pausedDistAccumulator = 0;
+      }
+      
+      this.prevLapDist = lapDist;
+      return;
+    }
+    
+    // 3. Process each corner's state machine
+    for (const corner of this.detectedCorners) {
+      // State: INIT -> TTS_PLAYED (TTS pre-briefing 250m before braking)
+      if (corner.state === 'INIT') {
+        const triggerMin = corner.brakeStartDist - 250;
+        const triggerMax = corner.brakeStartDist - 240;
+        
+        if (lapDist >= triggerMin && lapDist <= triggerMax) {
+          const ttsData = {
+            cornerId: corner.id,
+            gear: corner.targetGear,
+            brakePercent: Math.round(corner.targetBrakeMax * 100)
+          };
+          this.emit('tts-trigger', ttsData);
+          corner.state = 'TTS_PLAYED';
+          console.log(`[Analyzer] Triggered TTS for Corner #${corner.id}: Gear ${ttsData.gear}, Brake ${ttsData.brakePercent}%`);
+        }
+      }
+      
+      // State: TTS_PLAYED -> BRAKE_EVALUATED (Brake timing evaluation window)
+      if (corner.state === 'TTS_PLAYED') {
+        const entryMin = corner.brakeStartDist - 30;
+        const entryMax = corner.brakeStartDist + 20;
+        
+        if (lapDist >= entryMin && lapDist <= entryMax) {
+          // If user inputs brake >= 10%
+          if (userBrake >= 0.10) {
+            const deltaBrakeDist = lapDist - corner.brakeStartDist;
+            let result = 'Perfect';
+            
+            if (deltaBrakeDist < -15) {
+              result = 'Early';
+            } else if (deltaBrakeDist > 10) {
+              result = 'Late';
+            }
+            
+            const brakeFb = {
+              cornerId: corner.id,
+              result,
+              deltaD: deltaBrakeDist
+            };
+            this.emit('brake-timing-fb', brakeFb);
+            corner.state = 'BRAKE_EVALUATED';
+            console.log(`[Analyzer] Brake Feedback Corner #${corner.id}: ${result} (deltaD=${deltaBrakeDist.toFixed(1)}m)`);
+          }
+        } else if (lapDist > entryMax) {
+          // If they pass the entry zone without braking, skip evaluation to prevent ghost events
+          corner.state = 'BRAKE_EVALUATED';
+          console.log(`[Analyzer] Passed entry zone of Corner #${corner.id} without braking. Skipping evaluation.`);
+        }
+      }
+      
+      // State: BRAKE_EVALUATED -> APEX_EVALUATED (Apex speed evaluation window)
+      if (corner.state === 'BRAKE_EVALUATED') {
+        const apexMin = corner.apexDist - 15;
+        const apexMax = corner.apexDist + 15;
+        
+        if (lapDist >= apexMin && lapDist <= apexMax) {
+          // Record lowest speed observed in the window
+          if (this.cornerMinSpeeds[corner.id] === undefined || userSpeed < this.cornerMinSpeeds[corner.id]) {
+            this.cornerMinSpeeds[corner.id] = userSpeed;
+          }
+        } else if (lapDist > apexMax) {
+          // Once they pass the apex evaluation window, evaluate the lowest speed observed
+          const userMinSpeed = this.cornerMinSpeeds[corner.id];
+          
+          if (userMinSpeed !== undefined) {
+            const refApexSpeed = this.telemetryCache[corner.apexDist].speed;
+            const deltaSpeed = userMinSpeed - refApexSpeed;
+            let result = 'Perfect';
+            
+            if (deltaSpeed > 5.0) {
+              result = 'Overspeed';
+            } else if (deltaSpeed < -5.0) {
+              result = 'Too Slow';
+            }
+            
+            const apexFb = {
+              cornerId: corner.id,
+              result,
+              deltaV: deltaSpeed
+            };
+            this.emit('apex-speed-fb', apexFb);
+            corner.state = 'APEX_EVALUATED';
+            console.log(`[Analyzer] Apex Speed Feedback Corner #${corner.id}: ${result} (deltaV=${deltaSpeed.toFixed(1)}km/h, UserMin=${userMinSpeed.toFixed(1)}, Ref=${refApexSpeed.toFixed(1)})`);
+          } else {
+            // No speed data collected, just skip
+            corner.state = 'APEX_EVALUATED';
+          }
+        }
+      }
+    }
+    
+    this.prevLapDist = lapDist;
+  }
+}
+
+module.exports = new TelemetryAnalyzer();

@@ -31,3 +31,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearSessions: () => ipcRenderer.invoke('clear-sessions'),
   getRecordingStatus: () => ipcRenderer.invoke('get-recording-status')
 });
+
+contextBridge.exposeInMainWorld('apexAPI', {
+  onTTSTrigger: (callback) => {
+    const subscription = (event, data) => callback(data);
+    ipcRenderer.on('tts-trigger', subscription);
+    return () => {
+      ipcRenderer.removeListener('tts-trigger', subscription);
+    };
+  },
+  onBrakeTimingFeedback: (callback) => {
+    const subscription = (event, data) => callback(data);
+    ipcRenderer.on('brake-timing-fb', subscription);
+    return () => {
+      ipcRenderer.removeListener('brake-timing-fb', subscription);
+    };
+  },
+  onApexSpeedFeedback: (callback) => {
+    const subscription = (event, data) => callback(data);
+    ipcRenderer.on('apex-speed-fb', subscription);
+    return () => {
+      ipcRenderer.removeListener('apex-speed-fb', subscription);
+    };
+  },
+  onReferenceMissing: (callback) => {
+    const subscription = (event, data) => callback(data);
+    ipcRenderer.on('reference-missing', subscription);
+    return () => {
+      ipcRenderer.removeListener('reference-missing', subscription);
+    };
+  }
+});

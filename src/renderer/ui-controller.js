@@ -1,4 +1,5 @@
 // DOM Elements
+const controlPanel = document.getElementById('control-panel');
 const connectionBanner = document.getElementById('connection-banner');
 const connectionText = document.getElementById('connection-text');
 const recordingStatusBox = document.querySelector('.recording-status-box');
@@ -11,14 +12,37 @@ const lapsContainer = document.getElementById('laps-container');
 const btnClear = document.getElementById('btn-clear');
 const toast = document.getElementById('toast');
 
+// HUD DOM Elements
+const brakeHud = document.getElementById('brake-hud');
+const brakeIndicator = document.getElementById('brake-indicator');
+const brakeFeedbackBadge = document.getElementById('brake-feedback-badge');
+const brakeDetails = document.getElementById('brake-details');
+
+const apexHud = document.getElementById('apex-hud');
+const apexFeedbackBadge = document.getElementById('apex-feedback-badge');
+const apexDetails = document.getElementById('apex-details');
+
+const warningHud = document.getElementById('warning-hud');
+const flashScreen = document.getElementById('flash-screen');
+
 // Subscriptions cleanups
 let unsubConnection = null;
 let unsubSessionInfo = null;
 let unsubTelemetry = null;
+let unsubTTSTrigger = null;
+let unsubBrakeFeedback = null;
+let unsubApexFeedback = null;
+let unsubRefMissing = null;
+
+// HUD timeouts
+let brakeHudTimeout = null;
+let apexHudTimeout = null;
+let flashScreenTimeout = null;
 
 // Initialize
 async function init() {
   setupEventListeners();
+  setupHUDListeners();
   
   // Sync state on startup
   try {
@@ -35,11 +59,21 @@ async function init() {
     updateConnectionUI(connected);
     if (!connected) {
       resetRecordingUI();
+      // Show control panel when disconnected, hide HUDs
+      controlPanel.classList.remove('hidden');
+      warningHud.classList.add('hidden');
+      hideAllHUDs();
+    } else {
+      // Hide control panel when iRacing is connected
+      controlPanel.classList.add('hidden');
     }
   });
 
   unsubSessionInfo = window.electronAPI.onSessionInfo((info) => {
     updateSessionUI(info);
+    // Hide reference missing warning when a new session details are received, 
+    // it will be shown again if the new track/car lacks telemetry.
+    warningHud.classList.add('hidden');
   });
 
   unsubTelemetry = window.electronAPI.onTelemetryUpdate((data) => {
@@ -133,6 +167,127 @@ function updateLapsUI(laps) {
   }
 }
 
+// Setup Real-time HUD and Audio Coaching Listeners
+function setupHUDListeners() {
+  if (!window.apexAPI) return;
+
+  // 1. TTS Audio coaching trigger
+  unsubTTSTrigger = window.apexAPI.onTTSTrigger((ttsData) => {
+    const { gear, brakePercent, cornerId } = ttsData;
+    const ttsText = `코너 ${cornerId}, 기어 ${gear}단, 브레이크 ${brakePercent} 퍼센트 준비`;
+
+    // Immediately cancel previous speech to prevent delays or overlaps
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+    }
+
+    const utterance = new SpeechSynthesisUtterance(ttsText);
+    utterance.rate = 1.3; // Speed up slightly to deliver prompt in time
+    utterance.pitch = 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const koVoice = voices.find(v => v.lang.includes('ko-KR'));
+    if (koVoice) {
+      utterance.voice = koVoice;
+    }
+
+    window.speechSynthesis.speak(utterance);
+  });
+
+  // 2. Real-time Braking Point feedback
+  unsubBrakeFeedback = window.apexAPI.onBrakeTimingFeedback((fbData) => {
+    const { result, deltaD } = fbData;
+    
+    // Clear existing timeout
+    if (brakeHudTimeout) clearTimeout(brakeHudTimeout);
+
+    // Map deltaD [-30m, +20m] to progress bar percentage [0%, 100%]
+    // -30m = 0%, 0m (Perfect) = 50%, +20m = 100%
+    let percentage = 50;
+    if (deltaD < 0) {
+      // Early braking (-30m to 0m)
+      percentage = 50 + (deltaD / 30) * 50; 
+    } else if (deltaD > 0) {
+      // Late braking (0m to +20m)
+      percentage = 50 + (deltaD / 20) * 50;
+    }
+    const boundedPct = Math.max(0, Math.min(100, percentage));
+    
+    // Update indicator dot position
+    brakeIndicator.style.left = `${boundedPct}%`;
+
+    // Update text and class names
+    brakeFeedbackBadge.textContent = result.toUpperCase();
+    brakeFeedbackBadge.className = `feedback-badge ${result.toLowerCase()}`;
+    brakeDetails.textContent = `${deltaD > 0 ? '+' : ''}${deltaD.toFixed(1)}m`;
+
+    // Show HUD
+    brakeHud.classList.remove('hidden');
+
+    // Auto-hide after 3 seconds
+    brakeHudTimeout = setTimeout(() => {
+      brakeHud.classList.add('hidden');
+    }, 3000);
+  });
+
+  // 3. Real-time Apex speed feedback
+  unsubApexFeedback = window.apexAPI.onApexSpeedFeedback((fbData) => {
+    const { result, deltaV } = fbData;
+
+    // Clear existing timeouts
+    if (apexHudTimeout) clearTimeout(apexHudTimeout);
+    if (flashScreenTimeout) clearTimeout(flashScreenTimeout);
+
+    // Update text and classes
+    apexFeedbackBadge.textContent = result.toUpperCase();
+    
+    let resultClass = 'perfect';
+    if (result === 'Overspeed') resultClass = 'overspeed';
+    if (result === 'Too Slow') resultClass = 'tooslow';
+    
+    apexFeedbackBadge.className = `feedback-badge ${resultClass}`;
+    
+    if (result === 'Perfect') {
+      apexDetails.textContent = 'Perfect entry speed!';
+    } else {
+      apexDetails.textContent = `${deltaV > 0 ? '+' : ''}${deltaV.toFixed(1)} km/h`;
+    }
+
+    // Full-screen flash edge glow effect
+    flashScreen.className = 'apex-flash-screen'; // reset
+    void flashScreen.offsetWidth; // trigger reflow to restart animation
+    flashScreen.classList.add(`flash-${resultClass}`);
+
+    // Show HUD
+    apexHud.classList.remove('hidden');
+
+    // Auto-hide HUD and Edge Flash after 1.5 seconds
+    apexHudTimeout = setTimeout(() => {
+      apexHud.classList.add('hidden');
+    }, 1500);
+
+    flashScreenTimeout = setTimeout(() => {
+      flashScreen.classList.remove(`flash-${resultClass}`);
+    }, 1500);
+  });
+
+  // 4. Missing Reference Telemetry warning
+  unsubRefMissing = window.apexAPI.onReferenceMissing(() => {
+    warningHud.classList.remove('hidden');
+  });
+}
+
+function hideAllHUDs() {
+  brakeHud.classList.add('hidden');
+  apexHud.classList.add('hidden');
+  warningHud.classList.add('hidden');
+  flashScreen.className = 'apex-flash-screen';
+  
+  if (brakeHudTimeout) clearTimeout(brakeHudTimeout);
+  if (apexHudTimeout) clearTimeout(apexHudTimeout);
+  if (flashScreenTimeout) clearTimeout(flashScreenTimeout);
+}
+
 // Event Listeners setup
 function setupEventListeners() {
   btnClear.addEventListener('click', async () => {
@@ -148,7 +303,7 @@ function setupEventListeners() {
   });
 }
 
-// Save trigger wrapper
+// Save wrapper
 async function handleSave(lapId, sessionType, lapNumber) {
   try {
     showToast(`Saving ${sessionType} Lap ${lapNumber} telemetry...`);
@@ -164,7 +319,7 @@ async function handleSave(lapId, sessionType, lapNumber) {
   }
 }
 
-// Toast message handler
+// Toast handler
 let toastTimeout = null;
 function showToast(message, isError = false) {
   if (toastTimeout) {
@@ -190,6 +345,14 @@ window.addEventListener('beforeunload', () => {
   if (unsubConnection) unsubConnection();
   if (unsubSessionInfo) unsubSessionInfo();
   if (unsubTelemetry) unsubTelemetry();
+  if (unsubTTSTrigger) unsubTTSTrigger();
+  if (unsubBrakeFeedback) unsubBrakeFeedback();
+  if (unsubApexFeedback) unsubApexFeedback();
+  if (unsubRefMissing) unsubRefMissing();
+  
+  if (brakeHudTimeout) clearTimeout(brakeHudTimeout);
+  if (apexHudTimeout) clearTimeout(apexHudTimeout);
+  if (flashScreenTimeout) clearTimeout(flashScreenTimeout);
 });
 
 // Start

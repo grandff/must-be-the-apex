@@ -3,12 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Must Be The Apex - Telemetry Recorder</title>
+  <title>Must Be The Apex - Overlay HUD</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app-container">
-    <!-- Header with only Connection Status -->
+  <!-- Fullscreen Edge Glow Flash Overlay for Apex Speed Feedback -->
+  <div id="flash-screen" class="apex-flash-screen"></div>
+
+  <!-- In-Game HUD Elements (Click-Through overlays) -->
+  <div id="overlay-hud">
+    <!-- Brake Timing HUD -->
+    <div id="brake-hud" class="hud-panel hidden">
+      <div class="hud-title">BRAKE TIMING</div>
+      <div class="brake-visual">
+        <span class="scale-label early">EARLY</span>
+        <div class="brake-track">
+          <div class="brake-center-line"></div>
+          <div id="brake-indicator" class="brake-indicator-dot"></div>
+        </div>
+        <span class="scale-label late">LATE</span>
+      </div>
+      <div id="brake-feedback-badge" class="feedback-badge perfect">PERFECT</div>
+      <div id="brake-details" class="feedback-details">0.0m</div>
+    </div>
+
+    <!-- Apex Speed HUD -->
+    <div id="apex-hud" class="hud-panel apex-hud hidden">
+      <div class="hud-title">APEX SPEED</div>
+      <div id="apex-feedback-badge" class="feedback-badge perfect">PERFECT</div>
+      <div id="apex-details" class="feedback-details">+0.0 km/h</div>
+    </div>
+
+    <!-- Reference Data Warning HUD -->
+    <div id="warning-hud" class="hud-panel warning-hud hidden">
+      <span class="warning-icon">⚠️</span>
+      <div class="warning-text">REFERENCE TELEMETRY MISSING (CRAWL REQUIRED)</div>
+    </div>
+  </div>
+
+  <!-- Desktop Control Panel (Hidden when connected/playing to not block game) -->
+  <div id="control-panel" class="control-panel">
     <header class="app-header">
       <div class="logo-area">
         <span class="logo-icon">🏎️</span>
@@ -21,7 +55,6 @@
       </div>
     </header>
 
-    <!-- Main Content Panel (Minimal) -->
     <main class="main-panel">
       <!-- Recording Status Indicator -->
       <div class="recording-status-box">
@@ -43,7 +76,6 @@
           <button id="btn-clear" class="btn-clear">Clear All</button>
         </div>
 
-        <!-- This list will contain dynamically populated laps -->
         <div id="laps-container" class="laps-container">
           <div class="no-laps-message">기록된 랩 데이터가 없습니다. 트랙 주행을 시작하세요.</div>
         </div>
