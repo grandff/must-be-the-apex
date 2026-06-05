@@ -93,3 +93,7 @@ Thumbs.db
 release.sh
 tag-push.sh
 
+# Garage61 Scraper Browser Extension
+extensions/
+
+
