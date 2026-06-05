@@ -142,15 +142,11 @@ function setupIRacingHandlers() {
   // Listen to session info updates
   iracingClient.on('session-info', (info) => {
     if (info && info.track && info.car) {
-      // Slugify names to match database folder structure
-      const trackSlug = info.track.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      const carSlug = info.car.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      
-      const success = analyzer.loadTrackTelemetry(trackSlug, carSlug, info.trackLength || 4000);
+      const success = analyzer.loadTrackTelemetry(info.track, info.car, info.trackLength || 4000);
       if (success) {
-        console.log(`[Main] Loaded reference telemetry for track=${trackSlug}, car=${carSlug}`);
+        console.log(`[Main] Loaded reference telemetry for track=${analyzer.currentTrack}, car=${analyzer.currentCar}`);
       } else {
-        console.log(`[Main] No reference telemetry found/loaded for track=${trackSlug}, car=${carSlug}`);
+        console.log(`[Main] No reference telemetry found/loaded for track=${analyzer.currentTrack}, car=${analyzer.currentCar}`);
       }
     }
 

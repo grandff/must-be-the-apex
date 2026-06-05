@@ -1,5 +1,25 @@
 const EventEmitter = require('events');
+const path = require('path');
+const fs = require('fs');
 const dbManager = require('./db-manager');
+
+// Load tracks/cars metadata for mapping
+const tracksJsonPath = path.join(__dirname, '..', 'data', 'tracks.json');
+const carsJsonPath = path.join(__dirname, '..', 'data', 'cars.json');
+
+let tracksData = {};
+let carsData = {};
+
+try {
+  if (fs.existsSync(tracksJsonPath)) {
+    tracksData = JSON.parse(fs.readFileSync(tracksJsonPath, 'utf8'));
+  }
+  if (fs.existsSync(carsJsonPath)) {
+    carsData = JSON.parse(fs.readFileSync(carsJsonPath, 'utf8'));
+  }
+} catch (err) {
+  console.error('[Analyzer] Failed to load tracks/cars metadata JSON:', err.message);
+}
 
 class TelemetryAnalyzer extends EventEmitter {
   constructor() {
@@ -20,10 +40,69 @@ class TelemetryAnalyzer extends EventEmitter {
     this.cornerMinSpeeds = {};
   }
 
+  // Helper to slugify names exactly like the crawler and raw import script
+  slugify(name) {
+    if (!name) return '';
+    return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  }
+
+  // Find best G61 track slug match from iRacing track name
+  findBestTrackSlug(iracingTrackName) {
+    const iracingSlug = this.slugify(iracingTrackName);
+    
+    // 1. Direct exact slug match
+    for (const [id, name] of Object.entries(tracksData)) {
+      const g61Slug = this.slugify(name);
+      if (g61Slug === iracingSlug) {
+        return g61Slug;
+      }
+    }
+    
+    // 2. Substring slug match (e.g. G61 track name contains iRacing name or vice versa)
+    for (const [id, name] of Object.entries(tracksData)) {
+      const g61Slug = this.slugify(name);
+      if (g61Slug.includes(iracingSlug) || iracingSlug.includes(g61Slug)) {
+        console.log(`[Analyzer] Track mapping match: iRacing="${iracingTrackName}" -> G61="${name}"`);
+        return g61Slug;
+      }
+    }
+    
+    // 3. Fallback to raw iRacing slug
+    return iracingSlug;
+  }
+
+  // Find best G61 car slug match from iRacing car name
+  findBestCarSlug(iracingCarName) {
+    const iracingSlug = this.slugify(iracingCarName);
+    
+    // 1. Direct exact slug match
+    for (const [id, name] of Object.entries(carsData)) {
+      const g61Slug = this.slugify(name);
+      if (g61Slug === iracingSlug) {
+        return g61Slug;
+      }
+    }
+    
+    // 2. Substring slug match
+    for (const [id, name] of Object.entries(carsData)) {
+      const g61Slug = this.slugify(name);
+      if (g61Slug.includes(iracingSlug) || iracingSlug.includes(g61Slug)) {
+        console.log(`[Analyzer] Car mapping match: iRacing="${iracingCarName}" -> G61="${name}"`);
+        return g61Slug;
+      }
+    }
+    
+    // 3. Fallback to raw iRacing slug
+    return iracingSlug;
+  }
+
   // Load telemetry from DB, resample it, and extract corners
-  loadTrackTelemetry(trackName, carName, trackLength) {
-    this.currentTrack = trackName;
-    this.currentCar = carName;
+  loadTrackTelemetry(rawTrackName, rawCarName, trackLength) {
+    const trackSlug = this.findBestTrackSlug(rawTrackName);
+    const carSlug = this.findBestCarSlug(rawCarName);
+    
+    this.currentTrack = trackSlug;
+    this.currentCar = carSlug;
     this.trackLength = Math.round(trackLength);
     this.telemetryCache = [];
     this.detectedCorners = [];
@@ -32,12 +111,12 @@ class TelemetryAnalyzer extends EventEmitter {
     this.pausedDistAccumulator = 0;
     this.cornerMinSpeeds = {};
     
-    console.log(`[Analyzer] Loading telemetry for track="${trackName}" car="${carName}" trackLength=${trackLength}m`);
+    console.log(`[Analyzer] Loading telemetry for mapped track="${trackSlug}" car="${carSlug}" trackLength=${trackLength}m`);
     
-    const rawCsvData = dbManager.getReferenceTelemetry(trackName, carName);
+    const rawCsvData = dbManager.getReferenceTelemetry(trackSlug, carSlug);
     if (!rawCsvData) {
-      console.warn(`[Analyzer] No reference telemetry found in SQLite for track=${trackName}, car=${carName}`);
-      this.emit('reference-missing', { trackName, carName });
+      console.warn(`[Analyzer] No reference telemetry found in SQLite for track=${trackSlug}, car=${carSlug}`);
+      this.emit('reference-missing', { trackName: trackSlug, carName: carSlug });
       return false;
     }
     
@@ -229,7 +308,7 @@ class TelemetryAnalyzer extends EventEmitter {
     if (this.detectedCorners.length === 0 || !userTelemetry) return;
     
     const lapDist = Math.round(userTelemetry.lapDist);
-    const userSpeed = userTelemetry.speed * 3.6; // convert user speed to km/h
+    const userSpeed = userTelemetry.speed; // already in km/h from iracing-client.js
     const userBrake = userTelemetry.brake;
     
     // 1. Handle new lap / reset
