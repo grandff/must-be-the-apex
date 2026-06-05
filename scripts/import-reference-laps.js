@@ -32,10 +32,8 @@ rl.question('Please enter the path to the exported Garage 61 JSON file: ', (file
       process.exit(0);
     }
 
-    // Determine target directory (Documents/MustBeTheApex/Telemetry/Reference)
-    const os = require('os');
-    const docPath = path.join(os.homedir(), 'Documents');
-    const targetDir = path.join(docPath, 'MustBeTheApex', 'Telemetry', 'Reference', `${car}_${track}`);
+    // Determine target directory (extensions/data/[track]/[car])
+    const targetDir = path.join(__dirname, '..', 'extensions', 'data', track, car);
 
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
