@@ -1,4 +1,5 @@
 const EventEmitter = require('events');
+const logger = require('./logger');
 
 class IRacingClient extends EventEmitter {
   constructor() {
@@ -53,7 +54,7 @@ class IRacingClient extends EventEmitter {
       this.sdk.on('Connected', () => {
         this.isConnected = true;
         this.emit('connection-status', true);
-        console.log('iRacing Connected!');
+        logger.info('iRacing Connected!');
       });
 
       this.sdk.on('Disconnected', () => {
@@ -67,7 +68,7 @@ class IRacingClient extends EventEmitter {
           car: this.currentCar,
           sessionType: this.currentSessionType
         });
-        console.log('iRacing Disconnected.');
+        logger.info('iRacing Disconnected.');
       });
 
       this.sdk.on('SessionInfo', (evt) => {
@@ -126,7 +127,7 @@ class IRacingClient extends EventEmitter {
       });
 
     } catch (err) {
-      console.error('Native iRacing SDK failed to initialize. Falling back to mock.', err);
+      logger.error('Native iRacing SDK failed to initialize. Falling back to mock.', err);
       this.startMock();
     }
   }
@@ -144,7 +145,7 @@ class IRacingClient extends EventEmitter {
   }
 
   startMock() {
-    console.log('Running in Mock iRacing telemetry mode (non-Windows platform or native error).');
+    logger.info('Running in Mock iRacing telemetry mode (non-Windows platform or native error).');
     this.isConnected = true;
     this.currentTrack = 'Spa-Francorchamps (Mock GP)';
     this.currentCar = 'Porsche 911 GT3 R (Mock)';

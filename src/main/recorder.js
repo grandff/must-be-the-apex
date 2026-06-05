@@ -1,5 +1,6 @@
 const { dialog } = require('electron');
 const fs = require('fs');
+const logger = require('./logger');
 
 class TelemetryRecorder {
   constructor() {
@@ -16,7 +17,7 @@ class TelemetryRecorder {
 
   start() {
     this.isRecording = true;
-    console.log('Telemetry recording started.');
+    logger.info('Telemetry recording started.');
   }
 
   stop() {
@@ -25,7 +26,7 @@ class TelemetryRecorder {
     if (this.activeLap.frames.length > 0) {
       this.saveActiveLap();
     }
-    console.log('Telemetry recording paused.');
+    logger.info('Telemetry recording paused.');
   }
 
   clear() {
@@ -37,7 +38,7 @@ class TelemetryRecorder {
       lapNumber: -1,
       frames: []
     };
-    console.log('Recorded telemetry buffers cleared.');
+    logger.info('Recorded telemetry buffers cleared.');
   }
 
   addFrame(frame) {
@@ -86,7 +87,7 @@ class TelemetryRecorder {
     });
     this.lapFrames[id] = this.activeLap.frames;
     
-    console.log(`Saved lap: ${this.activeLap.sessionType} - Lap ${this.activeLap.lapNumber} (${this.activeLap.frames.length} frames).`);
+    logger.info(`Saved lap: ${this.activeLap.sessionType} - Lap ${this.activeLap.lapNumber} (${this.activeLap.frames.length} frames).`);
     
     // Silent background auto-save to local disk (no UI dialog needed)
     this.autoSaveLapCSV(id);
@@ -104,30 +105,56 @@ class TelemetryRecorder {
     const sessionName = lapMeta ? lapMeta.sessionType : 'Session';
     const lapNum = lapMeta ? lapMeta.lapNumber : 0;
 
+    const filename = `telemetry_${sessionName.toLowerCase()}_lap_${lapNum}_${Date.now()}.csv`;
+
+    const headers = ['SessionTime', 'LapDist', 'Speed', 'Throttle', 'Brake', 'Gear', 'Steering', 'RPM'];
+    let csvContent = headers.join(',') + '\n';
+    
+    const lines = frames.map(f => 
+      `${f.sessionTime.toFixed(3)},${f.lapDist.toFixed(2)},${f.speed.toFixed(2)},${f.throttle.toFixed(4)},${f.brake.toFixed(4)},${f.gear},${f.steering.toFixed(4)},${Math.round(f.rpm)}`
+    );
+    csvContent += lines.join('\n') + '\n';
+
+    // Try multiple directories in order of preference
+    const saveDirs = [];
     try {
-      const autoSaveDir = path.join(app.getPath('documents'), 'MustBeTheApex', 'Telemetry');
-      if (!fs.existsSync(autoSaveDir)) {
-        fs.mkdirSync(autoSaveDir, { recursive: true });
+      saveDirs.push({ path: path.join(app.getPath('documents'), 'MustBeTheApex', 'Telemetry'), type: 'documents' });
+    } catch (e) {}
+    try {
+      saveDirs.push({ path: path.join(app.getPath('userData'), 'Telemetry'), type: 'userData' });
+    } catch (e) {}
+    try {
+      saveDirs.push({ path: path.join(app.getPath('temp'), 'MustBeTheApexTelemetry'), type: 'temp' });
+    } catch (e) {}
+    saveDirs.push({ path: path.join(process.cwd(), 'Telemetry'), type: 'cwd' });
+
+    let saved = false;
+    const errors = [];
+
+    for (const dirObj of saveDirs) {
+      try {
+        if (!fs.existsSync(dirObj.path)) {
+          fs.mkdirSync(dirObj.path, { recursive: true });
+        }
+        const filePath = path.join(dirObj.path, filename);
+        fs.writeFileSync(filePath, csvContent, 'utf-8');
+        
+        if (dirObj.type === 'documents') {
+          logger.info(`[Auto-Save] Successfully saved telemetry to: ${filePath}`);
+        } else {
+          logger.warn(`[Auto-Save] Primary telemetry path failed. Saved to fallback path: ${filePath}`);
+        }
+        saved = true;
+        break;
+      } catch (err) {
+        errors.push(`${dirObj.path} (${err.message})`);
       }
+    }
 
-      const filename = `telemetry_${sessionName.toLowerCase()}_lap_${lapNum}_${Date.now()}.csv`;
-      const filePath = path.join(autoSaveDir, filename);
-
-      const headers = ['SessionTime', 'LapDist', 'Speed', 'Throttle', 'Brake', 'Gear', 'Steering', 'RPM'];
-      let csvContent = headers.join(',') + '\n';
-      
-      const lines = frames.map(f => 
-        `${f.sessionTime.toFixed(3)},${f.lapDist.toFixed(2)},${f.speed.toFixed(2)},${f.throttle.toFixed(4)},${f.brake.toFixed(4)},${f.gear},${f.steering.toFixed(4)},${Math.round(f.rpm)}`
-      );
-      csvContent += lines.join('\n') + '\n';
-
-      fs.writeFileSync(filePath, csvContent, 'utf-8');
-      console.log(`[Auto-Save] Successfully saved telemetry to: ${filePath}`);
-    } catch (err) {
-      console.error(`[Auto-Save] Failed to auto-save CSV file for lap ${lapId}:`, err);
+    if (!saved) {
+      logger.error(`[Auto-Save] Failed to auto-save CSV file for lap ${lapId}. Tried directories: ${errors.join(', ')}`);
     }
   }
-
 
   getLapsList() {
     const list = [...this.completedLaps];
@@ -183,9 +210,10 @@ class TelemetryRecorder {
       csvContent += lines.join('\n') + '\n';
 
       fs.writeFileSync(filePath, csvContent, 'utf-8');
+      logger.info(`[Manual-Save] Successfully saved telemetry to: ${filePath}`);
       return { success: true, filePath };
     } catch (err) {
-      console.error(`Failed to write CSV file for lap ${lapId}:`, err);
+      logger.error(`[Manual-Save] Failed to write CSV file for lap ${lapId}`, err);
       return { success: false, error: err.message };
     }
   }
