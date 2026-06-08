@@ -222,3 +222,15 @@ app.commandLine.appendSwitch('enable-gpu-rasterization');
   2. CSV 파일명 패턴 `session_<sessionType>_<trackName>_<carName>_<timestamp>.csv`을 검사해 트랙, 카, 세션명 메타데이터를 역추정합니다.
   3. CSV 데이터 내 최대 `LapDist` 값을 감지하여 트랙 총 길이(`trackLength`)로 할당합니다.
   4. 프레임 리스트를 통째로 적재하여 16ms 주기(`setInterval`)마다 `telemetry` 이벤트를 발생시키고, 배열 끝 도달 시 랩 인덱스를 올리며 순환 루프(Loop) 재생합니다.
+
+### 5.5 Electron 42 (V8 Sandbox / V8 13+) 네이티브 의존성(better-sqlite3) 빌드 에러 및 자동 패치 솔루션
+* **배경 및 원인**: Electron 42.3.3 버전은 현대적인 V8 Sandbox (V8 13.x) 엔진을 탑재하고 있어, 이전 버전의 API와 시그니처가 변경되었습니다. 이로 인해 C++ 네이티브 모듈인 `better-sqlite3` 컴파일 단계에서 다음과 같은 치명적 오류가 발생했습니다:
+  1. `SetNativeDataProperty` 호출 시 Setter 인자값으로 `0`이 전달되면서 C++ 오버로드 모호성 에러 발생 (V8 13.x `std::nullptr_t` 오버로드와의 충돌).
+  2. V8 Sandbox 활성화에 따라 `v8::External::Value()` 호출이 0개의 인자를 받을 수 없고 반드시 Pointer Type Tag (`v8::kExternalPointerTypeTagDefault`)를 요구하는 에러 발생.
+  3. `v8::External::New` 메서드 역시 Isolate와 Addon 포인터 외에 Type Tag 인자를 요구하는 에러 발생.
+* **해결 방법 (자동 패치 스크립트화)**:
+  * 로컬 개발 환경 및 GitHub Actions 빌드 환경(`windows-latest` 러너) 모두에서 수정 사항이 영구히, 안정적으로 작동할 수 있도록 `scripts/patch-node-irsdk.js` 자동 빌드 전처리 패치 스크립트에 `better-sqlite3` 패치 로직을 통합했습니다:
+    1. **`better-sqlite3/src/util/helpers.cpp`**: `SetNativeDataProperty` 함수의 3번째 인자 `0`을 `nullptr`로 변경하여 오버로드 모호성 해결.
+    2. **`better-sqlite3/src/util/macros.cpp`**: `OnlyAddon` 매크로를 확장하여 `V8_EXTERNAL_POINTER_TAG_COUNT`가 정의된 환경(V8 Sandbox 활성화)에서는 `Value(v8::kExternalPointerTypeTagDefault)`를 사용하도록 전처리 조건부 컴파일 가드 추가.
+    3. **`better-sqlite3/src/better_sqlite3.cpp`**: `v8::External::New` 인스턴스화 시 Sandbox 환경에서는 `v8::kExternalPointerTypeTagDefault` 태그를 인자로 함께 전달하도록 수정.
+  * 이로써 소스 코드가 cross-platform 빌드 파이프라인에서 빌드 시점 전에 정상 조치되며, Windows GitHub Actions CI와 macOS 로컬 빌드 모두 에러 없이 빌드가 완벽히 통과됩니다.
