@@ -144,7 +144,9 @@ class IRacingClient extends EventEmitter {
           steering: values.SteeringWheelAngle || values.Steering || 0,
           rpm: values.RPM || 0,
           lap: values.Lap || 0,
-          sessionType: this.currentSessionType
+          sessionType: this.currentSessionType,
+          airTemp: values.AirTemp !== undefined ? values.AirTemp : null,
+          trackTemp: values.TrackTemp !== undefined ? values.TrackTemp : null
         };
 
         this.emit('telemetry', telemetryData);
@@ -171,6 +173,117 @@ class IRacingClient extends EventEmitter {
   startMock() {
     logger.info('Running in Mock iRacing telemetry mode (non-Windows platform or native error).');
     this.isConnected = true;
+
+    const path = require('path');
+    const fs = require('fs');
+    const mockDir = path.join(__dirname, '..', '..', 'assets', 'mock');
+
+    try {
+      if (!fs.existsSync(mockDir)) {
+        fs.mkdirSync(mockDir, { recursive: true });
+      }
+
+      const files = fs.readdirSync(mockDir).filter(f => f.endsWith('.csv'));
+      if (files.length > 0) {
+        const filePath = path.join(mockDir, files[0]);
+        const dataStr = fs.readFileSync(filePath, 'utf-8');
+        const lines = dataStr.split(/\r?\n/).filter(line => line.trim() !== '');
+
+        if (lines.length > 1) {
+          const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+          const sessionTimeIdx = headers.indexOf('sessiontime');
+          const lapIdx = headers.indexOf('lap');
+          const lapDistIdx = headers.indexOf('lapdist');
+          const speedIdx = headers.indexOf('speed');
+          const throttleIdx = headers.indexOf('throttle');
+          const brakeIdx = headers.indexOf('brake');
+          const gearIdx = headers.indexOf('gear');
+          const steeringIdx = headers.indexOf('steering');
+          const rpmIdx = headers.indexOf('rpm');
+
+          if (sessionTimeIdx !== -1 && lapDistIdx !== -1) {
+            const csvFrames = [];
+            for (let i = 1; i < lines.length; i++) {
+              const cols = lines[i].split(',');
+              if (cols.length < headers.length) continue;
+              csvFrames.push({
+                sessionTime: parseFloat(cols[sessionTimeIdx]) || 0,
+                lap: lapIdx !== -1 ? (parseInt(cols[lapIdx]) || 1) : 1,
+                lapDist: parseFloat(cols[lapDistIdx]) || 0,
+                speed: speedIdx !== -1 ? (parseFloat(cols[speedIdx]) || 0) : 0,
+                throttle: throttleIdx !== -1 ? (parseFloat(cols[throttleIdx]) || 0) : 0,
+                brake: brakeIdx !== -1 ? (parseFloat(cols[brakeIdx]) || 0) : 0,
+                gear: gearIdx !== -1 ? (parseInt(cols[gearIdx]) || 0) : 0,
+                steering: steeringIdx !== -1 ? (parseFloat(cols[steeringIdx]) || 0) : 0,
+                rpm: rpmIdx !== -1 ? (parseFloat(cols[rpmIdx]) || 0) : 0
+              });
+            }
+
+            if (csvFrames.length > 0) {
+              let maxDist = 0;
+              for (const f of csvFrames) {
+                if (f.lapDist > maxDist) maxDist = f.lapDist;
+              }
+              this.currentTrackLength = Math.max(4000, Math.ceil(maxDist));
+
+              // Attempt parsing track and car name from filename
+              const basename = path.basename(filePath, '.csv');
+              const parts = basename.split('_');
+              if (parts.length >= 4) {
+                this.currentSessionType = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
+                this.currentTrack = parts[2].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                this.currentCar = parts[3].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+              } else {
+                this.currentTrack = 'Spa-Francorchamps (CSV Mock)';
+                this.currentCar = 'Porsche 911 GT3 R (CSV Mock)';
+                this.currentSessionType = 'Practice';
+              }
+
+              logger.info(`[Mock] Loaded CSV playback from ${filePath}: track="${this.currentTrack}", car="${this.currentCar}", length=${this.currentTrackLength}m, frames=${csvFrames.length}`);
+
+              setTimeout(() => {
+                this.emit('connection-status', true);
+                this.emit('session-info', {
+                  track: this.currentTrack,
+                  car: this.currentCar,
+                  sessionType: this.currentSessionType,
+                  trackLength: this.currentTrackLength
+                });
+              }, 500);
+
+              let frameIndex = 0;
+              this.mockInterval = setInterval(() => {
+                if (!this.isConnected || csvFrames.length === 0) return;
+                const frame = csvFrames[frameIndex];
+                const telemetryData = {
+                  sessionTime: frame.sessionTime,
+                  lapDist: frame.lapDist,
+                  speed: frame.speed,
+                  throttle: frame.throttle,
+                  brake: frame.brake,
+                  gear: frame.gear,
+                  steering: frame.steering,
+                  rpm: frame.rpm,
+                  lap: frame.lap,
+                  sessionType: this.currentSessionType,
+                  airTemp: 22.0,
+                  trackTemp: 28.0
+                };
+
+                this.emit('telemetry', telemetryData);
+                frameIndex = (frameIndex + 1) % csvFrames.length;
+              }, this.POLL_INTERVAL);
+
+              return;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      logger.error('Error scanning/parsing mock CSV files, falling back to Spa procedural generator:', err);
+    }
+
+    // Default Fallback: Spa procedural generator
     this.currentTrack = 'Spa-Francorchamps (Mock GP)';
     this.currentCar = 'Porsche 911 GT3 R (Mock)';
     this.currentSessionType = 'Practice';
@@ -189,40 +302,35 @@ class IRacingClient extends EventEmitter {
     let dist = 0;
     let lapTime = 0;
     let lapNumber = 1;
-    const trackLength = 7004; // Spa track length
+    const trackLength = 7004;
     let sessionNum = 0;
     const sessionTypes = ['Practice', 'Qualify', 'Race'];
 
     this.mockInterval = setInterval(() => {
       if (!this.isConnected) return;
 
-      // Simulate a car moving
-      // Speed changes depending on position (corners vs straight)
-      let targetSpeed = 240; // straight speed
+      let targetSpeed = 240;
       
-      // spa corners simulation (simple)
       if ((dist > 300 && dist < 600) || (dist > 1500 && dist < 1900) || (dist > 3000 && dist < 3400) || (dist > 5000 && dist < 5500) || (dist > 6500 && dist < 6800)) {
-        targetSpeed = 80; // corner speed
+        targetSpeed = 80;
       }
 
-      // Smooth speed interpolation
-      const currentSpeed = targetSpeed; // Keep it simple
+      const currentSpeed = targetSpeed;
       const speedMPS = currentSpeed / 3.6;
       
-      // Update distance (60Hz -> divide by 60)
       dist += speedMPS / 60;
       lapTime += 1 / 60;
 
       if (dist >= trackLength) {
         dist = 0;
         lapNumber += 1;
-        // Cycle session type every lap just to demonstrate session split in mock mode
         sessionNum = (sessionNum + 1) % sessionTypes.length;
         this.currentSessionType = sessionTypes[sessionNum];
         this.emit('session-info', {
           track: this.currentTrack,
           car: this.currentCar,
-          sessionType: this.currentSessionType
+          sessionType: this.currentSessionType,
+          trackLength: this.currentTrackLength
         });
       }
 
@@ -242,7 +350,9 @@ class IRacingClient extends EventEmitter {
         steering: steering,
         rpm: currentSpeed * 30 + 1000,
         lap: lapNumber,
-        sessionType: this.currentSessionType
+        sessionType: this.currentSessionType,
+        airTemp: 22.0,
+        trackTemp: 28.0
       };
 
       this.emit('telemetry', telemetryData);

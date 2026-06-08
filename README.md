@@ -22,11 +22,15 @@
 ## 🛠️ 핵심 기능 (Key Features)
 
 1. **코너 브레이크 타이밍 프로그레스 바 (Overlay)**
-   * 탑 랭커의 제동 개시 미터(LapDist)와 유저의 실제 브레이킹 시점을 60Hz로 정밀 대조하여 오버레이 화면에 `Early` (빠름) / `Late` (느림) / `Perfect` (완벽) 시각적 표시.
-2. **코너 진입 전 실시간 음성 브리핑 (Zero-latency TTS)**
-   * 코너 진입 250m 전방에서 해당 코너의 목표 단수(Gear)와 브레이크 압력(Max Brake Pressure)을 윈도우 네이티브 한국어 TTS로 오디오 브리핑.
-3. **에이펙스(Apex) 속도 피드백**
-   * 코너 중심점(최저 속도점) 통과 시 고수와 유저의 속도차를 실시간으로 비교하여 플래시 효과(`Overspeed` / `Too Slow` / `Perfect`)와 함께 사운드 피드백 제공.
+   * 탑 랭커의 제동 개시 미터(LapDist)와 유저의 실제 브레이킹 시점을 60Hz로 정밀 대조하여 오버레이 화면에 5단계(`TOO EARLY` / `EARLY` / `PERFECT` / `LATE` / `TOO LATE`) 제동 게이지 가로 스케일 바 시각화.
+2. ** upcoming Corner Focus Guide (Overlay)**
+   * 코너 200m 전방에서 실시간 남은 거리 카운트다운(m) 및 목표 공략 정보(기어 단수, 최대 브레이크 압력 %, 회전 방향)를 화면 오버레이 카드 형태로 상시 안내.
+3. **코너 진입 전 실시간 음성 브리핑 (Zero-latency TTS)**
+   * 코너 진입 250m 전방에서 해당 코너의 목표 단수(Gear)와 브레이크 압력(Max Brake Pressure)을 윈도우 네이티브 한국어 TTS로 무지연 오디오 브리핑.
+4. **에이펙스(Apex) 속도 피드백 & 에지 플래시**
+   * 코너 중심점(최저 속도점) 통과 시 고수와 유저의 속도차를 실시간 비교하여 화면 에두리에 풀스크린 에지 글로우 플래시 효과(`Overspeed` / `Too Slow` / `Perfect`) 제공.
+5. **점진적 고스트 매칭 (Progressive Ghost Matching)**
+   * 사용자의 랩 타임 최고 기록(PB)을 바탕으로, 사용자가 다음 번에 꺾을 수 있는 "약간 빠른 상위 레벨 탑 랭커 레퍼런스"를 SQLite DB에서 자동 매치합니다. 랩 완료 순간 기록이 경신되면 차세대 타겟으로 자동 업그레이드 됩니다.
 
 ---
 
@@ -43,11 +47,7 @@
 * **인메모리 배열 캐시 ($O(1)$ Lookup)**: 주행 중 실시간 DB 조회 오버헤드를 배제하기 위해, 세션 로드 시 SQLite DB에서 매칭 데이터를 꺼내어 **1m 단위 인덱스 배열 (`telemetryCache`)**로 메모리에 완전히 구조화합니다.
 
 ### 3. 코너 자동 추출 엔진 (Dynamic Corner Extraction)
-* 특정 트랙에 의존적인 하드코딩 데이터가 불필요합니다. 레퍼런스 텔레메트리 로드 시 속도의 로컬 미니멈(Local Minima)과 휠 조향률, 브레이크 최대 입력을 역추적하여 **코너 위치, 브레이크 시작 시점($D_{brake\_start}$), 에이펙스 위치($D_{apex}$)**를 자동으로 판정하고 가상 코너 맵을 메모리 상에 사전 구성합니다.
-
-### 4. 오차 정밀 보정 및 예외 처리
-* **트랙 길이 캘리브레이션**: iRacing과 외부 레퍼런스 파일 간의 트랙 누적 거리 오차를 스케일링 팩터 $S$로 변환하여 실시간 대조 시 축척을 완벽히 매핑합니다.
-* **스핀/역주행 방어**: 유저가 코스를 이탈하거나 사고로 역주행할 경우 상태 머신이 오동작하는 것을 막기 위해 1프레임당 거리 이동량 및 역류 속도를 모니터링하여 코칭 연산을 자동으로 일시정지(`PAUSE`)하고 정상 주행 복귀 시 활성화합니다.
+* 특정 트랙에 의존적인 하드코딩 데이터가 불필요합니다. 레퍼런스 텔레메트리 로드 시 속도의 로컬 미니멈(Local Minima)과 휠 조향률, 브레이크 최대 입력을 역추적하여 **코너 위치, 브레이크 시작 시점($D_{brake\_start}$), 에이펙스 위치($D_{apex}$), 코너 회전 방향(Left/Right)**을 자동으로 판정하고 가상 코너 맵을 메모리 상에 사전 구성합니다.
 
 ---
 
@@ -61,16 +61,16 @@ must-be-the-apex/
 ├── src/
 │   ├── main/                  # 메인 프로세스 (Node.js Core)
 │   │   ├── index.js           # 일렉트론 엔트리, 윈도우 생성 및 생명주기
-│   │   ├── iracing-client.js  # node-irsdk 연동 및 실시간 데이터 수집
-│   │   ├── db-manager.js      # SQLite DB 조회 매니저
+│   │   ├── iracing-client.js  # node-irsdk 연동 및 실시간 데이터 수집 / macOS Mock 플레이백
+│   │   ├── db-manager.js      # SQLite DB 조회 매니저 및 PB 관리
 │   │   └── analyzer.js        # 실시간 데이터 대조, 코너 분석 및 코칭 상태 머신
 │   ├── renderer/              # 렌더러 프로세스 (오버레이 UI)
 │   │   ├── index.html         # 투명 뷰포트 레이아웃
-│   │   ├── style.css          # 오버레이 CSS 애니메이션
-│   │   └── ui-controller.js   # IPC 리스너, DOM 드로잉, Web Speech TTS 재생
+│   │   ├── style.css          # F1 스타일 그래픽 및 스킨
+│   │   └── ui-controller.js   # IPC 리스너, DOM 드로잉, Web Speech TTS 재생, 드래그/리사이즈
 │   └── preload.js             # Context Isolation 기반 IPC 브릿지
 ├── assets/
-│   └── mock/                  # macOS 로컬 개발용 시뮬레이션용 더미 데이터 (.json)
+│   └── mock/                  # macOS 로컬 개발용 실주행 텔레메트리 데이터 (.csv)
 ├── package.json
 └── electron-builder.json      # 빌드/패키징 배포 옵션
 ```
@@ -84,19 +84,29 @@ must-be-the-apex/
 npm install
 ```
 
-### 2. 로컬 실행
-* **Windows (iRacing 실행 상태 또는 대기 상태)**:
-  ```bash
-  npm start
-  ```
-* **macOS / Linux (더미 텔레메트리를 활용한 화면 개발 및 테스트)**:
-  `process.platform !== 'win32'`일 경우 자동으로 `assets/mock/`의 JSON 덤프 파일로 60Hz 더미 스트림을 생성하여 오버레이 연산 및 TTS 작동을 오프라인으로 테스트할 수 있습니다.
-  ```bash
-  npm start
-  ```
+### 2. 로컬 실행 및 오프라인 검증 (macOS 개발 환경 테스트)
+macOS 환경에서 주행 데이터 연동과 오버레이 HUD 기능을 검증하기 위해 **실주행 CSV 덤프 플레이백 엔진**이 포함되어 있습니다.
+1. `assets/mock/` 폴더를 생성합니다. (자동 생성됨)
+2. 일렉트론 실행 중에 기록되어 자동 저장되거나 수동 다운로드한 실주행 CSV 파일(예: `session_practice_spa-francorchamps_porsche-911-gt3-r.csv`) 중 검증하고자 하는 파일을 `assets/mock/` 폴더 내에 위치시킵니다.
+3. 애플리케이션을 구동합니다:
+   ```bash
+   npm start
+   ```
+4. 플레이백 엔진이 CSV 파일명과 내용을 분석하여 트랙명, 차량명, 최대 길이를 파싱하고 60Hz 주기로 텔레메트리 데이터를 방출합니다. 유저는 맥북 환경에서도 오버레이의 브레이크 타이밍 게이지, 코너 Focus Guide 카운트다운, 에이펙스 에지 글로우 깜빡임 및 무지연 음성 가이드를 실시간으로 테스트할 수 있습니다.
+5. `assets/mock/` 내에 CSV가 없는 경우, 기본 Spa-Francorchamps 수학 제네레이터 폴백이 적용됩니다.
 
-### 3. 단일 실행 파일 (.exe) 빌드
+### 3. HUD 위젯 위치 및 크기 편집 (Edit Mode)
+1. 앱이 실행된 상태에서 글로벌 단축키 **`Command+Shift+O` (macOS)** 또는 **`Control+Shift+O` (Windows)**를 입력합니다.
+2. 화면 상단에 붉은색 **"HUD EDIT MODE"** 배너가 켜지며 마우스 클릭이 오버레이에 차단되지 않고 위젯을 잡을 수 있게 됩니다.
+3. 각 HUD 위젯 상단의 빨간색 바(Drag Handle)를 잡아 드래그하여 위치를 옮기고, 하단 우측 모서리(Resize Handle)를 드래그해 위젯 크기를 재설정합니다.
+4. 다시 **`Command+Shift+O` / `Control+Shift+O`**를 누르면 편집 모드가 잠금 해제되고 레이아웃이 로컬 저장소(`localStorage`)에 영구 보존된 채 마우스 클릭 관통(Click-Through) 게임 오버레이 모드로 복원됩니다.
+
+### 4. 세션 단위 데이터 관리
+* 주행 중 데이터 수집 시 랩마다 누적되던 기록을 단일 통합 세션 CSV 파일 포맷으로 일체화하였습니다.
+* CSV 데이터 내에 `Lap` 칼럼이 추가 기재되므로 세션 이력 관리가 정돈되며, 다운로드 목록 카드에도 날짜, 서킷, 차량, 총 랩 수 및 프레임 크기가 직관적으로 표출됩니다.
+
+### 5. 단일 실행 파일 (.exe) 빌드
 ```bash
 npm run dist
 ```
-* **GitHub Actions** CI와 연동되어 푸시 시 C++ 네이티브 모듈 컴파일 에러 없는 온전한 인스톨러 패키지가 배포됩니다.
+* **GitHub Actions** CI 워크플로우와 연동되어 있으므로 저장소 푸시 시 C++ 네이티브 모듈 컴파일 충돌 없이 온전한 윈도우 단일 인스톨러 패키지가 빌드 완료됩니다.

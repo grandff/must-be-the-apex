@@ -4,12 +4,14 @@ const logger = require('./logger');
 
 class TelemetryRecorder {
   constructor() {
-    this.completedLaps = []; // Array of { id, sessionType, lapNumber, frameCount }
-    this.lapFrames = {};     // Map of lapId -> frames array
-    this.activeLap = {
+    this.completedSessions = []; // Array of { id, sessionType, track, car, startTime, frameCount, lapCount }
+    this.sessionFrames = {};     // Map of sessionId -> frames array
+    this.activeSession = {
       id: null,
       sessionType: null,
-      lapNumber: -1,
+      track: null,
+      car: null,
+      startTime: null,
       frames: []
     };
     this.isRecording = false;
@@ -22,51 +24,61 @@ class TelemetryRecorder {
 
   stop() {
     this.isRecording = false;
-    // Commit the active lap on stop if it contains data
-    if (this.activeLap.frames.length > 0) {
-      this.saveActiveLap();
+    // Commit the active session on stop if it contains data
+    if (this.activeSession.frames.length > 0) {
+      this.saveActiveSession();
     }
     logger.info('Telemetry recording paused.');
   }
 
   clear() {
-    this.completedLaps = [];
-    this.lapFrames = {};
-    this.activeLap = {
+    this.completedSessions = [];
+    this.sessionFrames = {};
+    this.activeSession = {
       id: null,
       sessionType: null,
-      lapNumber: -1,
+      track: null,
+      car: null,
+      startTime: null,
       frames: []
     };
     logger.info('Recorded telemetry buffers cleared.');
   }
 
-  addFrame(frame) {
+  addFrame(frame, track, car) {
     if (!this.isRecording) return;
     
     const sessionType = frame.sessionType || 'Practice';
-    const lapNumber = frame.lap;
+    const currentTrack = track || 'Unknown Track';
+    const currentCar = car || 'Unknown Car';
 
-    // Detect lap boundary or session boundary
-    if (this.activeLap.lapNumber !== lapNumber || this.activeLap.sessionType !== sessionType) {
-      // Commit previous active lap if it contains data
-      if (this.activeLap.frames.length > 0) {
-        this.saveActiveLap();
+    // Detect session type, track, or car boundary
+    if (this.activeSession.sessionType !== sessionType || 
+        this.activeSession.track !== currentTrack || 
+        this.activeSession.car !== currentCar ||
+        !this.activeSession.id) {
+      
+      // Commit previous active session if it contains data
+      if (this.activeSession.frames.length > 0) {
+        this.saveActiveSession();
       }
 
-      // Start new active lap
-      const uniqueId = `${sessionType}_Lap_${lapNumber}_${Date.now()}`;
-      this.activeLap = {
+      // Start new active session
+      const uniqueId = `${sessionType}_Session_${Date.now()}`;
+      this.activeSession = {
         id: uniqueId,
         sessionType: sessionType,
-        lapNumber: lapNumber,
+        track: currentTrack,
+        car: currentCar,
+        startTime: new Date().toISOString(),
         frames: []
       };
     }
 
-    // Append frame
-    this.activeLap.frames.push({
+    // Append frame including the lap number
+    this.activeSession.frames.push({
       sessionTime: frame.sessionTime,
+      lap: frame.lap,
       lapDist: frame.lapDist,
       speed: frame.speed,
       throttle: frame.throttle,
@@ -77,41 +89,56 @@ class TelemetryRecorder {
     });
   }
 
-  saveActiveLap() {
-    const id = this.activeLap.id;
-    this.completedLaps.push({
+  saveActiveSession() {
+    const id = this.activeSession.id;
+    const uniqueLaps = new Set(this.activeSession.frames.map(f => f.lap));
+    const lapCount = uniqueLaps.size;
+
+    this.completedSessions.push({
       id: id,
-      sessionType: this.activeLap.sessionType,
-      lapNumber: this.activeLap.lapNumber,
-      frameCount: this.activeLap.frames.length
+      sessionType: this.activeSession.sessionType,
+      track: this.activeSession.track,
+      car: this.activeSession.car,
+      startTime: this.activeSession.startTime,
+      lapCount: lapCount,
+      frameCount: this.activeSession.frames.length
     });
-    this.lapFrames[id] = this.activeLap.frames;
+    this.sessionFrames[id] = this.activeSession.frames;
     
-    logger.info(`Saved lap: ${this.activeLap.sessionType} - Lap ${this.activeLap.lapNumber} (${this.activeLap.frames.length} frames).`);
+    logger.info(`Saved session: ${this.activeSession.sessionType} - ${this.activeSession.track} - ${this.activeSession.car} (${this.activeSession.frames.length} frames, ${lapCount} laps).`);
     
     // Silent background auto-save to local disk (no UI dialog needed)
-    this.autoSaveLapCSV(id);
+    this.autoSaveSessionCSV(id);
   }
 
-  autoSaveLapCSV(lapId) {
+  autoSaveSessionCSV(sessionId) {
     const { app } = require('electron');
     const path = require('path');
     
-    let frames = this.lapFrames[lapId];
+    let frames = this.sessionFrames[sessionId];
+    if (!frames && this.activeSession.id === sessionId) {
+      frames = this.activeSession.frames;
+    }
     if (!frames || frames.length === 0) return;
 
-    const lapMeta = this.completedLaps.find(l => l.id === lapId) || 
-                    (this.activeLap.id === lapId ? this.activeLap : null);
-    const sessionName = lapMeta ? lapMeta.sessionType : 'Session';
-    const lapNum = lapMeta ? lapMeta.lapNumber : 0;
+    const sessionMeta = this.completedSessions.find(s => s.id === sessionId) || 
+                        (this.activeSession.id === sessionId ? this.activeSession : null);
+    const sessionName = sessionMeta ? sessionMeta.sessionType : 'Session';
+    const trackName = sessionMeta ? sessionMeta.track : 'UnknownTrack';
+    const carName = sessionMeta ? sessionMeta.car : 'UnknownCar';
 
-    const filename = `telemetry_${sessionName.toLowerCase()}_lap_${lapNum}_${Date.now()}.csv`;
+    // Sanitize values for safe filenames
+    const cleanTrack = trackName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const cleanCar = carName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const cleanSession = sessionName.trim().toLowerCase();
+    
+    const filename = `session_${cleanSession}_${cleanTrack}_${cleanCar}_${Date.now()}.csv`;
 
-    const headers = ['SessionTime', 'LapDist', 'Speed', 'Throttle', 'Brake', 'Gear', 'Steering', 'RPM'];
+    const headers = ['SessionTime', 'Lap', 'LapDist', 'Speed', 'Throttle', 'Brake', 'Gear', 'Steering', 'RPM'];
     let csvContent = headers.join(',') + '\n';
     
     const lines = frames.map(f => 
-      `${f.sessionTime.toFixed(3)},${f.lapDist.toFixed(2)},${f.speed.toFixed(2)},${f.throttle.toFixed(4)},${f.brake.toFixed(4)},${f.gear},${f.steering.toFixed(4)},${Math.round(f.rpm)}`
+      `${f.sessionTime.toFixed(3)},${f.lap},${f.lapDist.toFixed(2)},${f.speed.toFixed(2)},${f.throttle.toFixed(4)},${f.brake.toFixed(4)},${f.gear},${f.steering.toFixed(4)},${Math.round(f.rpm)}`
     );
     csvContent += lines.join('\n') + '\n';
 
@@ -140,7 +167,7 @@ class TelemetryRecorder {
         fs.writeFileSync(filePath, csvContent, 'utf-8');
         
         if (dirObj.type === 'documents') {
-          logger.info(`[Auto-Save] Successfully saved telemetry to: ${filePath}`);
+          logger.info(`[Auto-Save] Successfully saved session telemetry to: ${filePath}`);
         } else {
           logger.warn(`[Auto-Save] Primary telemetry path failed. Saved to fallback path: ${filePath}`);
         }
@@ -152,45 +179,55 @@ class TelemetryRecorder {
     }
 
     if (!saved) {
-      logger.error(`[Auto-Save] Failed to auto-save CSV file for lap ${lapId}. Tried directories: ${errors.join(', ')}`);
+      logger.error(`[Auto-Save] Failed to auto-save CSV file for session ${sessionId}. Tried directories: ${errors.join(', ')}`);
     }
   }
 
   getLapsList() {
-    const list = [...this.completedLaps];
-    if (this.activeLap.frames && this.activeLap.frames.length > 0) {
+    // We return sessions matching the expected shape for UI list (rename key 'laps' to sessions implicitly, or just keep structural compatibility)
+    const list = [...this.completedSessions];
+    if (this.activeSession.frames && this.activeSession.frames.length > 0) {
+      const uniqueLaps = new Set(this.activeSession.frames.map(f => f.lap));
       list.push({
-        id: this.activeLap.id,
-        sessionType: this.activeLap.sessionType,
-        lapNumber: this.activeLap.lapNumber,
-        frameCount: this.activeLap.frames.length,
+        id: this.activeSession.id,
+        sessionType: this.activeSession.sessionType,
+        track: this.activeSession.track,
+        car: this.activeSession.car,
+        startTime: this.activeSession.startTime,
+        lapCount: uniqueLaps.size,
+        frameCount: this.activeSession.frames.length,
         isActive: true
       });
     }
     return list;
   }
 
-  async saveLapCSV(window, lapId) {
-    let frames = this.lapFrames[lapId];
+  async saveLapCSV(window, sessionId) {
+    let frames = this.sessionFrames[sessionId];
     
-    // Check if the requested lap is currently active
-    if (!frames && this.activeLap.id === lapId) {
-      frames = this.activeLap.frames;
+    // Check if the requested session is currently active
+    if (!frames && this.activeSession.id === sessionId) {
+      frames = this.activeSession.frames;
     }
 
     if (!frames || frames.length === 0) {
-      return { success: false, error: 'No data recorded for this lap.' };
+      return { success: false, error: 'No data recorded for this session.' };
     }
 
-    // Find lap metadata to construct default path
-    const lapMeta = this.completedLaps.find(l => l.id === lapId) || 
-                    (this.activeLap.id === lapId ? this.activeLap : null);
-    const sessionName = lapMeta ? lapMeta.sessionType : 'Session';
-    const lapNum = lapMeta ? lapMeta.lapNumber : 0;
+    const sessionMeta = this.completedSessions.find(s => s.id === sessionId) || 
+                        (this.activeSession.id === sessionId ? this.activeSession : null);
+    const sessionName = sessionMeta ? sessionMeta.sessionType : 'Session';
+    const trackName = sessionMeta ? sessionMeta.track : 'UnknownTrack';
+    const carName = sessionMeta ? sessionMeta.car : 'UnknownCar';
+
+    // Sanitize values for default filename
+    const cleanTrack = trackName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const cleanCar = carName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const cleanSession = sessionName.trim().toLowerCase();
 
     const { filePath } = await dialog.showSaveDialog(window, {
-      title: `Save ${sessionName} Lap ${lapNum} Telemetry`,
-      defaultPath: `telemetry_${sessionName.toLowerCase()}_lap_${lapNum}.csv`,
+      title: `Save ${sessionName} Session Telemetry`,
+      defaultPath: `session_${cleanSession}_${cleanTrack}_${cleanCar}.csv`,
       filters: [
         { name: 'CSV Files', extensions: ['csv'] }
       ]
@@ -201,19 +238,19 @@ class TelemetryRecorder {
     }
 
     try {
-      const headers = ['SessionTime', 'LapDist', 'Speed', 'Throttle', 'Brake', 'Gear', 'Steering', 'RPM'];
+      const headers = ['SessionTime', 'Lap', 'LapDist', 'Speed', 'Throttle', 'Brake', 'Gear', 'Steering', 'RPM'];
       let csvContent = headers.join(',') + '\n';
       
       const lines = frames.map(f => 
-        `${f.sessionTime.toFixed(3)},${f.lapDist.toFixed(2)},${f.speed.toFixed(2)},${f.throttle.toFixed(4)},${f.brake.toFixed(4)},${f.gear},${f.steering.toFixed(4)},${Math.round(f.rpm)}`
+        `${f.sessionTime.toFixed(3)},${f.lap},${f.lapDist.toFixed(2)},${f.speed.toFixed(2)},${f.throttle.toFixed(4)},${f.brake.toFixed(4)},${f.gear},${f.steering.toFixed(4)},${Math.round(f.rpm)}`
       );
       csvContent += lines.join('\n') + '\n';
 
       fs.writeFileSync(filePath, csvContent, 'utf-8');
-      logger.info(`[Manual-Save] Successfully saved telemetry to: ${filePath}`);
+      logger.info(`[Manual-Save] Successfully saved session telemetry to: ${filePath}`);
       return { success: true, filePath };
     } catch (err) {
-      logger.error(`[Manual-Save] Failed to write CSV file for lap ${lapId}`, err);
+      logger.error(`[Manual-Save] Failed to write CSV file for session ${sessionId}`, err);
       return { success: false, error: err.message };
     }
   }

@@ -26,6 +26,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     };
   },
 
+  onToggleEditMode: (callback) => {
+    const subscription = (event, isEditMode) => callback(isEditMode);
+    ipcRenderer.on('toggle-edit-mode', subscription);
+    return () => {
+      ipcRenderer.removeListener('toggle-edit-mode', subscription);
+    };
+  },
+
+  setIgnoreMouseEvents: (ignore, options) => {
+    ipcRenderer.send('set-ignore-mouse-events', ignore, options);
+  },
+
   // Invokers
   saveLap: (lapId) => ipcRenderer.invoke('save-lap', lapId),
   clearSessions: () => ipcRenderer.invoke('clear-sessions'),
@@ -59,6 +71,27 @@ contextBridge.exposeInMainWorld('apexAPI', {
     ipcRenderer.on('reference-missing', subscription);
     return () => {
       ipcRenderer.removeListener('reference-missing', subscription);
+    };
+  },
+  onReferenceLoaded: (callback) => {
+    const subscription = (event, data) => callback(data);
+    ipcRenderer.on('reference-loaded', subscription);
+    return () => {
+      ipcRenderer.removeListener('reference-loaded', subscription);
+    };
+  },
+  onUpcomingCorner: (callback) => {
+    const subscription = (event, data) => callback(data);
+    ipcRenderer.on('upcoming-corner', subscription);
+    return () => {
+      ipcRenderer.removeListener('upcoming-corner', subscription);
+    };
+  },
+  onTargetUpgraded: (callback) => {
+    const subscription = (event, data) => callback(data);
+    ipcRenderer.on('target-upgraded', subscription);
+    return () => {
+      ipcRenderer.removeListener('target-upgraded', subscription);
     };
   }
 });

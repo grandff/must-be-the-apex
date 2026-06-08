@@ -434,49 +434,301 @@ body {
   z-index: 5;
 }
 
-/* Glassmorphic HUD Panels */
+/* Edit Mode Banner */
+.edit-mode-banner {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) skewX(-10deg);
+  background: #e10600;
+  color: white;
+  padding: 10px 30px;
+  font-family: var(--font-header);
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 0 20px rgba(225, 6, 0, 0.6);
+  z-index: 100;
+  letter-spacing: 1.5px;
+}
+
+.edit-mode-banner.hidden {
+  display: none;
+}
+
+/* Glassmorphic HUD Panels (F1 TV Broadcast Style) */
 .hud-panel {
   position: absolute;
-  background-color: rgba(16, 20, 29, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 18px 24px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(12px);
+  background-color: rgba(11, 14, 19, 0.88);
+  border-left: 4px solid var(--accent-red);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  padding: 14px 20px;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(15px);
   color: var(--text-primary);
   font-family: var(--font-main);
-  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  opacity: 1;
+  transform: skewX(-10deg);
+  box-sizing: border-box;
+  overflow: visible;
 }
 
 .hud-panel.hidden {
   opacity: 0;
-  transform: translate(-50%, 15px);
+  transform: skewX(-10deg) translateY(15px);
   pointer-events: none;
 }
 
 .hud-title {
   font-family: var(--font-header);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   color: var(--text-secondary);
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 4px;
+}
+
+/* Drag & Resize handles in Edit Mode */
+.drag-handle {
+  display: none;
+  position: absolute;
+  top: -24px;
+  left: -4px; /* Align with skewed border */
+  width: calc(100% + 4px);
+  height: 24px;
+  background: var(--accent-red);
+  color: white;
+  font-family: var(--font-header);
+  font-size: 8px;
+  font-weight: 800;
   text-align: center;
+  line-height: 24px;
+  cursor: move;
+  letter-spacing: 1px;
+}
+
+.resize-handle {
+  display: none;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, transparent 50%, var(--accent-red) 50%);
+  cursor: se-resize;
+  border-radius: 0 0 3px 0;
+}
+
+/* Edit Mode Activations */
+.edit-mode .hud-panel {
+  border: 1.5px dashed var(--accent-red) !important;
+  border-left: 4px solid var(--accent-red) !important;
+  pointer-events: auto !important; /* Enable mouse clicks for dragging/resizing */
+}
+
+.edit-mode .drag-handle, 
+.edit-mode .resize-handle {
+  display: block;
+}
+
+/* 1. Target HUD default layout */
+.target-hud {
+  top: 30px;
+  right: 30px;
+  width: 320px;
+}
+
+.target-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
+.target-row .label {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.target-row .value {
+  color: var(--text-primary);
+  font-weight: 400;
+}
+
+.target-row .value.highlight {
+  color: var(--accent-green);
+  font-weight: 700;
+}
+
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.upgrade-badge {
+  background-color: var(--accent-green);
+  color: #000;
+  font-family: var(--font-header);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px;
+  text-align: center;
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+  animation: flash-green 1.5s infinite;
+}
+
+@keyframes flash-green {
+  0%, 100% { background-color: var(--accent-green); box-shadow: 0 0 10px rgba(0, 255, 135, 0.4); }
+  50% { background-color: #00b359; box-shadow: none; }
+}
+
+/* 2. Upcoming Corner Focus HUD */
+.focus-hud {
+  top: 30px;
+  left: 30px;
+  width: 340px;
+  min-height: 160px;
+}
+
+.corner-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 12px;
 }
 
-/* 1. Brake Timing HUD Styles */
-#brake-hud {
-  bottom: 25%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 420px;
+.corner-title {
+  font-family: var(--font-header);
+  font-size: 15px;
+  font-weight: 800;
+  color: white;
 }
 
-#brake-hud.hidden {
-  opacity: 0;
-  transform: translateX(-50%) translateY(20px);
-  pointer-events: none;
+.corner-dir {
+  font-family: var(--font-header);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  background: #242c3e;
+  border-radius: 2px;
+}
+
+.corner-dir.Left {
+  color: #2196f3;
+  border-left: 3px solid #2196f3;
+}
+
+.corner-dir.Right {
+  color: #ff9800;
+  border-left: 3px solid #ff9800;
+}
+
+.focus-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.focus-detail-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.box-label {
+  font-size: 8px;
+  color: var(--text-secondary);
+  font-weight: 700;
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
+.box-value {
+  font-family: var(--font-header);
+  font-size: 16px;
+  font-weight: 800;
+  color: white;
+}
+
+.countdown-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.countdown-text-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.countdown-meters {
+  font-family: var(--font-header);
+  font-size: 12px;
+  color: var(--accent-red);
+  font-weight: 800;
+}
+
+.countdown-bar-outer {
+  height: 5px;
+  background-color: #1a2230;
+  border-radius: 2.5px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.countdown-bar-inner {
+  height: 100%;
+  background-color: var(--accent-red);
+  border-radius: 2.5px;
+  transition: width 0.1s linear;
+}
+
+.focus-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-header);
+  font-size: 12px;
+  color: #4e5a70;
+  font-weight: 800;
+  padding: 30px 0;
+}
+
+.focus-fallback.hidden {
+  display: none;
+}
+
+/* 3. Live Guide HUD (Combo HUD) */
+.live-guide-hud {
+  left: calc(50vw - 230px);
+  bottom: 50px;
+  width: 460px;
+}
+
+.hud-section {
+  padding: 4px 0;
+}
+
+.section-divider {
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.08);
+  margin: 10px 0;
 }
 
 .brake-visual {
@@ -484,31 +736,31 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .scale-label {
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 8px;
+  font-weight: 800;
   letter-spacing: 0.5px;
-  width: 45px;
+  width: 65px;
 }
 
-.scale-label.early {
+.scale-label.too-early {
   color: #ffeb3b;
   text-align: right;
 }
 
-.scale-label.late {
+.scale-label.too-late {
   color: var(--accent-red);
   text-align: left;
 }
 
 .brake-track {
   flex: 1;
-  height: 6px;
-  background-color: #242c3e;
-  border-radius: 3px;
+  height: 8px;
+  background-color: #1f2735;
+  border-radius: 4px;
   position: relative;
   overflow: visible;
 }
@@ -518,35 +770,41 @@ body {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 2px;
-  height: 12px;
+  width: 3px;
+  height: 16px;
   background-color: var(--accent-green);
-  box-shadow: 0 0 6px var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
 }
 
 .brake-indicator-dot {
   position: absolute;
   top: 50%;
-  left: 50%; /* 0 to 100% position mapping */
+  left: 50%; /* Default center */
   transform: translate(-50%, -50%);
   width: 14px;
   height: 14px;
   border-radius: 50%;
   background-color: var(--text-primary);
   border: 2px solid var(--bg-dark);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.9);
   transition: left 0.1s ease-out;
 }
 
-/* Feedback Badges */
+.brake-feedback-row, 
+.apex-feedback-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 10px;
+}
+
 .feedback-badge {
   font-family: var(--font-header);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
-  text-align: center;
+  text-align: left;
   letter-spacing: 0.5px;
-  margin-bottom: 4px;
-  text-shadow: 0 0 12px rgba(255, 255, 255, 0.1);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
   animation: pop-in 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -557,56 +815,52 @@ body {
 
 .feedback-badge.perfect {
   color: var(--accent-green);
-  text-shadow: 0 0 15px rgba(0, 255, 135, 0.4);
+  text-shadow: 0 0 12px rgba(0, 255, 135, 0.4);
+}
+
+.feedback-badge.too-early {
+  color: #ffeb3b;
+  text-shadow: 0 0 12px rgba(255, 235, 95, 0.4);
 }
 
 .feedback-badge.early {
-  color: #ffeb3b;
-  text-shadow: 0 0 15px rgba(255, 235, 95, 0.4);
+  color: #c0ca33;
+  text-shadow: 0 0 12px rgba(192, 202, 51, 0.4);
 }
 
 .feedback-badge.late {
-  color: var(--accent-red);
-  text-shadow: 0 0 15px rgba(255, 24, 1, 0.4);
+  color: #ff9800;
+  text-shadow: 0 0 12px rgba(255, 152, 0, 0.4);
 }
 
-.feedback-details {
-  font-size: 11px;
-  color: var(--text-secondary);
-  text-align: center;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-/* 2. Apex HUD Styles */
-#apex-hud {
-  top: 30%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 320px;
-}
-
-#apex-hud.hidden {
-  opacity: 0;
-  transform: translate(-50%, -40%) scale(0.95);
-  pointer-events: none;
+.feedback-badge.too-late {
+  color: #ff3d00;
+  text-shadow: 0 0 12px rgba(255, 61, 0, 0.4);
 }
 
 .feedback-badge.overspeed {
-  color: var(--accent-red);
-  text-shadow: 0 0 15px rgba(255, 24, 1, 0.4);
+  color: #ff3d00;
+  text-shadow: 0 0 12px rgba(255, 61, 0, 0.4);
 }
 
 .feedback-badge.tooslow {
   color: #ffeb3b;
-  text-shadow: 0 0 15px rgba(255, 235, 95, 0.4);
+  text-shadow: 0 0 12px rgba(255, 235, 95, 0.4);
 }
 
-/* 3. Warning HUD Styles */
+.feedback-details {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-align: right;
+}
+
+/* 4. Warning HUD Styles */
 .warning-hud {
   top: 80px;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) skewX(-10deg);
   background-color: rgba(255, 24, 1, 0.1);
   border: 1px solid rgba(255, 24, 1, 0.3);
   color: #ff3c3c;
@@ -614,7 +868,7 @@ body {
   align-items: center;
   gap: 12px;
   padding: 12px 20px;
-  border-radius: 6px;
+  border-radius: 4px;
   font-weight: 700;
   font-size: 11px;
   letter-spacing: 0.5px;
@@ -623,7 +877,7 @@ body {
 
 .warning-hud.hidden {
   opacity: 0;
-  transform: translateX(-50%) translateY(-15px);
+  transform: translateX(-50%) skewX(-10deg) translateY(-15px);
   pointer-events: none;
 }
 
@@ -631,7 +885,7 @@ body {
   font-size: 14px;
 }
 
-/* 4. Fullscreen Edge Flash Overlays */
+/* 5. Fullscreen Edge Flash Overlays */
 .apex-flash-screen {
   position: absolute;
   top: 0;
@@ -651,7 +905,7 @@ body {
 }
 
 .apex-flash-screen.flash-overspeed {
-  box-shadow: inset 0 0 120px rgba(255, 24, 1, 0.85);
+  box-shadow: inset 0 0 120px rgba(255, 61, 0, 0.85);
   opacity: 1;
   transition: opacity 0.08s ease-out;
 }
@@ -661,3 +915,4 @@ body {
   opacity: 1;
   transition: opacity 0.08s ease-out;
 }
+

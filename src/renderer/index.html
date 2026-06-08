@@ -10,28 +10,105 @@
   <!-- Fullscreen Edge Glow Flash Overlay for Apex Speed Feedback -->
   <div id="flash-screen" class="apex-flash-screen"></div>
 
+  <!-- Edit Mode Active Top Banner -->
+  <div id="edit-mode-banner" class="edit-mode-banner hidden">
+    HUD EDIT MODE - DRAG & RESIZE PANELS - PRESS CTRL+SHIFT+O TO LOCK
+  </div>
+
   <!-- In-Game HUD Elements (Click-Through overlays) -->
   <div id="overlay-hud">
-    <!-- Brake Timing HUD -->
-    <div id="brake-hud" class="hud-panel hidden">
-      <div class="hud-title">BRAKE TIMING</div>
-      <div class="brake-visual">
-        <span class="scale-label early">EARLY</span>
-        <div class="brake-track">
-          <div class="brake-center-line"></div>
-          <div id="brake-indicator" class="brake-indicator-dot"></div>
-        </div>
-        <span class="scale-label late">LATE</span>
+    <!-- 1. Target Status HUD -->
+    <div id="target-status-hud" class="hud-panel target-hud">
+      <div class="drag-handle">TARGET STATUS</div>
+      <div class="hud-title">TARGET LAP</div>
+      <div id="target-upgrade-badge" class="upgrade-badge hidden">TARGET UPGRADED!</div>
+      <div class="target-row">
+        <span class="label">FILE:</span>
+        <span id="target-file" class="value truncate">Searching...</span>
       </div>
-      <div id="brake-feedback-badge" class="feedback-badge perfect">PERFECT</div>
-      <div id="brake-details" class="feedback-details">0.0m</div>
+      <div class="target-row">
+        <span class="label">TARGET TIME:</span>
+        <span id="target-time" class="value highlight">--:--.---</span>
+      </div>
+      <div class="target-row">
+        <span class="label">PERSONAL BEST:</span>
+        <span id="target-user-pb" class="value">--:--.---</span>
+      </div>
+      <div class="target-row">
+        <span class="label">WEATHER:</span>
+        <span id="target-weather" class="value">Air: --°C | Track: --°C</span>
+      </div>
+      <div class="resize-handle"></div>
     </div>
 
-    <!-- Apex Speed HUD -->
-    <div id="apex-hud" class="hud-panel apex-hud hidden">
-      <div class="hud-title">APEX SPEED</div>
-      <div id="apex-feedback-badge" class="feedback-badge perfect">PERFECT</div>
-      <div id="apex-details" class="feedback-details">+0.0 km/h</div>
+    <!-- 2. Upcoming Corner Focus Guide HUD -->
+    <div id="next-lap-focus-hud" class="hud-panel focus-hud">
+      <div class="drag-handle">FOCUS GUIDE</div>
+      <div class="hud-title">UPCOMING CORNER</div>
+      <div id="focus-content">
+        <div class="corner-header-row">
+          <span id="focus-corner-title" class="corner-title">TURN --</span>
+          <span id="focus-corner-dir" class="corner-dir Left">LEFT</span>
+        </div>
+        <div class="focus-details-grid">
+          <div class="focus-detail-box">
+            <span class="box-label">GEAR</span>
+            <span id="focus-target-gear" class="box-value">-</span>
+          </div>
+          <div class="focus-detail-box">
+            <span class="box-label">MAX BRAKE</span>
+            <span id="focus-target-brake" class="box-value">-%</span>
+          </div>
+        </div>
+        <div class="countdown-container">
+          <div class="countdown-text-row">
+            <span>BRAKE IN</span>
+            <span id="focus-distance-value" class="countdown-meters">---m</span>
+          </div>
+          <div class="countdown-bar-outer">
+            <div id="focus-countdown-bar" class="countdown-bar-inner" style="width: 100%;"></div>
+          </div>
+        </div>
+      </div>
+      <div id="focus-fallback" class="focus-fallback">
+        FLAT OUT / STRAIGHT
+      </div>
+      <div class="resize-handle"></div>
+    </div>
+
+    <!-- 3. Live Guide HUD (Brake timing gauge + Apex feedback) -->
+    <div id="live-guide-hud" class="hud-panel live-guide-hud">
+      <div class="drag-handle">LIVE COACHING</div>
+      
+      <!-- Brake Timing Section -->
+      <div id="brake-hud" class="hud-section">
+        <div class="hud-title">BRAKE TIMING</div>
+        <div class="brake-visual">
+          <span class="scale-label too-early">TOO EARLY</span>
+          <div class="brake-track">
+            <div class="brake-center-line"></div>
+            <div id="brake-indicator" class="brake-indicator-dot"></div>
+          </div>
+          <span class="scale-label too-late">TOO LATE</span>
+        </div>
+        <div class="brake-feedback-row">
+          <span id="brake-feedback-badge" class="feedback-badge perfect">READY</span>
+          <span id="brake-details" class="feedback-details">0.0m</span>
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <!-- Apex Speed Section -->
+      <div id="apex-hud" class="hud-section">
+        <div class="hud-title">APEX SPEED</div>
+        <div class="apex-feedback-row">
+          <span id="apex-feedback-badge" class="feedback-badge perfect">READY</span>
+          <span id="apex-details" class="feedback-details">0.0 km/h</span>
+        </div>
+      </div>
+
+      <div class="resize-handle"></div>
     </div>
 
     <!-- Reference Data Warning HUD -->
@@ -41,7 +118,7 @@
     </div>
   </div>
 
-  <!-- Desktop Control Panel (Hidden when connected/playing to not block game) -->
+  <!-- Desktop Control Panel -->
   <div id="control-panel" class="control-panel">
     <header class="app-header">
       <div class="logo-area">

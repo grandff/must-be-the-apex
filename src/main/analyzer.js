@@ -32,6 +32,8 @@ class TelemetryAnalyzer extends EventEmitter {
     
     // State machine tracking
     this.prevLapDist = -1;
+    this.prevLap = -1;
+    this.lapStartTime = 0;
     this.isPaused = false;
     this.pausedDistAccumulator = 0;
     
@@ -97,7 +99,7 @@ class TelemetryAnalyzer extends EventEmitter {
   }
 
   // Load telemetry from DB, resample it, and extract corners
-  loadTrackTelemetry(rawTrackName, rawCarName, trackLength) {
+  loadTrackTelemetry(rawTrackName, rawCarName, trackLength, airTemp, trackTemp) {
     const trackSlug = this.findBestTrackSlug(rawTrackName);
     const carSlug = this.findBestCarSlug(rawCarName);
     
@@ -107,22 +109,39 @@ class TelemetryAnalyzer extends EventEmitter {
     this.telemetryCache = [];
     this.detectedCorners = [];
     this.prevLapDist = -1;
+    this.prevLap = -1;
+    this.lapStartTime = 0;
     this.isPaused = false;
     this.pausedDistAccumulator = 0;
     this.cornerMinSpeeds = {};
     
-    console.log(`[Analyzer] Loading telemetry for mapped track="${trackSlug}" car="${carSlug}" trackLength=${trackLength}m`);
+    // Cache the loaded temperatures to prevent redundant reloads
+    this.loadedAirTemp = airTemp;
+    this.loadedTrackTemp = trackTemp;
     
-    const rawCsvData = dbManager.getReferenceTelemetry(trackSlug, carSlug);
-    if (!rawCsvData) {
+    console.log(`[Analyzer] Loading telemetry for mapped track="${trackSlug}" car="${carSlug}" trackLength=${trackLength}m (AirTemp=${airTemp}°C, TrackTemp=${trackTemp}°C)`);
+    
+    const userPB = dbManager.getUserPB(trackSlug, carSlug);
+    const targetRow = dbManager.getTargetTelemetry(trackSlug, carSlug, airTemp, trackTemp, userPB);
+    
+    if (!targetRow) {
       console.warn(`[Analyzer] No reference telemetry found in SQLite for track=${trackSlug}, car=${carSlug}`);
       this.emit('reference-missing', { trackName: trackSlug, carName: carSlug });
       return false;
     }
     
-    const success = this.parseAndResample(rawCsvData);
+    const success = this.parseAndResample(targetRow.raw_csv_data);
     if (success) {
       this.extractCorners();
+      this.emit('reference-loaded', {
+        fileName: targetRow.file_name,
+        targetLapTimeMs: targetRow.lap_time_ms,
+        userPBMs: userPB,
+        trackName: trackSlug,
+        carName: carSlug,
+        airTemp: targetRow.air_temp,
+        trackTemp: targetRow.track_temp
+      });
     }
     return success;
   }
@@ -130,7 +149,15 @@ class TelemetryAnalyzer extends EventEmitter {
   // Parse G61 CSV and interpolate to 1m steps
   parseAndResample(csvText) {
     try {
-      const lines = csvText.trim().split('\n');
+      const allLines = csvText.trim().split('\n');
+      const lines = [];
+      for (const line of allLines) {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+          lines.push(trimmed);
+        }
+      }
+      
       if (lines.length < 2) return false;
       
       const header = lines[0].split(',');
@@ -286,6 +313,18 @@ class TelemetryAnalyzer extends EventEmitter {
           targetBrakeMax = this.telemetryCache[d].brake;
         }
       }
+
+      // Calculate turn direction based on steering angle sign around the apex
+      let steeringSum = 0;
+      let steeringPoints = 0;
+      const scanStart = Math.max(0, apex - 10);
+      const scanEnd = Math.min(this.trackLength, apex + 10);
+      for (let d = scanStart; d <= scanEnd; d++) {
+        steeringSum += this.telemetryCache[d].steering;
+        steeringPoints++;
+      }
+      const avgSteeringVal = steeringPoints > 0 ? steeringSum / steeringPoints : 0;
+      const turnDirection = avgSteeringVal >= 0 ? 'Left' : 'Right';
       
       this.detectedCorners.push({
         id: cornerId++,
@@ -293,27 +332,93 @@ class TelemetryAnalyzer extends EventEmitter {
         apexDist: apex,
         targetGear: this.telemetryCache[apex].gear,
         targetBrakeMax: targetBrakeMax,
+        turnDirection: turnDirection,
         state: 'INIT'
       });
     }
     
     console.log(`[Analyzer] Detected ${this.detectedCorners.length} corners on track:`);
     this.detectedCorners.forEach(c => {
-      console.log(`  Corner #${c.id}: BrakeStart=${c.brakeStartDist}m, Apex=${c.apexDist}m, TargetGear=${c.targetGear}, MaxBrake=${(c.targetBrakeMax * 100).toFixed(0)}%`);
+      console.log(`  Corner #${c.id}: ${c.turnDirection} | BrakeStart=${c.brakeStartDist}m, Apex=${c.apexDist}m, TargetGear=${c.targetGear}, MaxBrake=${(c.targetBrakeMax * 100).toFixed(0)}%`);
     });
+  }
+
+  // Handle lap completion: check for PB, update DB and reload progressive target telemetry
+  handleLapCompletion(lapTimeMs) {
+    if (this.isPaused) {
+      console.log('[Analyzer] Lap was marked invalid/paused due to course out or spin. Skipping PB update.');
+      return;
+    }
+
+    if (lapTimeMs < 30000 || lapTimeMs > 600000) {
+      console.log(`[Analyzer] Lap time of ${(lapTimeMs/1000).toFixed(3)}s is out of reasonable range (30s-10m). Skipping PB update.`);
+      return;
+    }
+
+    const trackSlug = this.currentTrack;
+    const carSlug = this.currentCar;
+    const oldPB = dbManager.getUserPB(trackSlug, carSlug);
+
+    if (!oldPB || lapTimeMs < oldPB) {
+      dbManager.updateUserPB(trackSlug, carSlug, lapTimeMs);
+      console.log(`[Analyzer] NEW PERSONAL BEST! Old PB: ${oldPB ? (oldPB/1000).toFixed(3) + 's' : 'None'}, New PB: ${(lapTimeMs/1000).toFixed(3)}s`);
+
+      // Query if a new target telemetry was unlocked
+      const airTemp = this.loadedAirTemp;
+      const trackTemp = this.loadedTrackTemp;
+      const newTargetRow = dbManager.getTargetTelemetry(trackSlug, carSlug, airTemp, trackTemp, lapTimeMs);
+
+      if (newTargetRow) {
+        console.log(`[Analyzer] Upgrading target telemetry to: ${newTargetRow.file_name} (${(newTargetRow.lap_time_ms/1000).toFixed(3)}s)`);
+        const success = this.parseAndResample(newTargetRow.raw_csv_data);
+        if (success) {
+          this.extractCorners();
+          this.emit('target-upgraded', {
+            fileName: newTargetRow.file_name,
+            targetLapTimeMs: newTargetRow.lap_time_ms,
+            userPBMs: lapTimeMs,
+            trackName: trackSlug,
+            carName: carSlug
+          });
+        }
+      }
+    }
   }
 
   // Real-time loop updater called at 60Hz or throttled rate
   updateTelemetry(userTelemetry) {
-    if (this.detectedCorners.length === 0 || !userTelemetry) return;
+    if (!userTelemetry) return;
+    
+    // Trigger lazy reload when we detect valid temperatures from iRacing for the first time in this session
+    if (userTelemetry.airTemp !== undefined && userTelemetry.airTemp !== null && 
+        userTelemetry.trackTemp !== undefined && userTelemetry.trackTemp !== null && 
+        this.loadedAirTemp === undefined) {
+      console.log(`[Analyzer] Valid iRacing temperatures detected (Air: ${userTelemetry.airTemp}°C, Track: ${userTelemetry.trackTemp}°C). Lazy-reloading weather matched reference telemetry...`);
+      this.loadTrackTelemetry(this.currentTrack, this.currentCar, this.trackLength, userTelemetry.airTemp, userTelemetry.trackTemp);
+    }
+    
+    if (this.detectedCorners.length === 0) return;
     
     const lapDist = Math.round(userTelemetry.lapDist);
     const userSpeed = userTelemetry.speed; // already in km/h from iracing-client.js
     const userBrake = userTelemetry.brake;
+    const currentLap = userTelemetry.lap;
+    const sessionTime = userTelemetry.sessionTime;
+
+    // Lap tracking and completion detection
+    if (this.prevLap === -1) {
+      this.prevLap = currentLap;
+      this.lapStartTime = sessionTime;
+    } else if (currentLap > this.prevLap) {
+      const lapTimeMs = Math.round((sessionTime - this.lapStartTime) * 1000);
+      this.handleLapCompletion(lapTimeMs);
+      this.prevLap = currentLap;
+      this.lapStartTime = sessionTime;
+    }
     
     // 1. Handle new lap / reset
     if (this.prevLapDist === -1 || lapDist < this.prevLapDist - 500) {
-      console.log('[Analyzer] New lap detected or telemetry reset. Resetting corner states.');
+      console.log('[Analyzer] New lap distance detected or telemetry reset. Resetting corner states.');
       this.detectedCorners.forEach(c => c.state = 'INIT');
       this.cornerMinSpeeds = {};
       this.isPaused = false;
@@ -389,8 +494,12 @@ class TelemetryAnalyzer extends EventEmitter {
             let result = 'Perfect';
             
             if (deltaBrakeDist < -15) {
+              result = 'Too Early';
+            } else if (deltaBrakeDist < -5) {
               result = 'Early';
-            } else if (deltaBrakeDist > 10) {
+            } else if (deltaBrakeDist > 15) {
+              result = 'Too Late';
+            } else if (deltaBrakeDist > 5) {
               result = 'Late';
             }
             
@@ -449,6 +558,20 @@ class TelemetryAnalyzer extends EventEmitter {
           }
         }
       }
+    }
+    
+    // 4. Emit upcoming-corner distance info within 200m of braking points
+    const upcoming = this.detectedCorners.find(c => lapDist < c.brakeStartDist && c.state !== 'APEX_EVALUATED');
+    if (upcoming && (upcoming.brakeStartDist - lapDist <= 200)) {
+      this.emit('upcoming-corner', {
+        cornerId: upcoming.id,
+        turnDirection: upcoming.turnDirection,
+        targetGear: upcoming.targetGear,
+        targetBrakeMax: upcoming.targetBrakeMax,
+        distanceToBrake: upcoming.brakeStartDist - lapDist
+      });
+    } else {
+      this.emit('upcoming-corner', null);
     }
     
     this.prevLapDist = lapDist;

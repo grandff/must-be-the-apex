@@ -59,20 +59,61 @@ telemetryFiles.forEach(file => {
     
     const srcPath = path.join(downloadsDir, file);
     
-    // Copy file to all specified target directories
+    // Find corresponding weather JSON file
+    // Check both literal match and sanitized versions if suffixes exist
+    const cleanBaseName = file.replace(/\.csv$/i, '');
+    const weatherJsonFile = cleanBaseName + ' - weather.json';
+    const weatherJsonPath = path.join(downloadsDir, weatherJsonFile);
+    
+    let metaComments = '';
+    if (fs.existsSync(weatherJsonPath)) {
+      try {
+        const w = JSON.parse(fs.readFileSync(weatherJsonPath, 'utf8'));
+        const metaLines = [
+          `# G61_WEATHER: ${w.sky || 'Unknown'}`,
+          `# G61_AIR_TEMP: ${w.airTemp || 'Unknown'}`,
+          `# G61_TRACK_TEMP: ${w.trackTemp || 'Unknown'}`,
+          `# G61_WIND_SPEED: ${w.windSpeed || 'Unknown'}`,
+          `# G61_WIND_DIR: ${w.windDir || 'Unknown'}`,
+          `# G61_HUMIDITY: ${w.humidity || 'Unknown'}`,
+          `# G61_PRESSURE: ${w.pressure || 'Unknown'}`,
+          `# G61_AIR_DENSITY: ${w.density || 'Unknown'}`,
+          `# G61_PRECIPITATION: ${w.precip || 'Unknown'}`,
+          `# G61_TRACK_WETNESS: ${w.wetness || 'Unknown'}`,
+          `# G61_TRACK_USAGE: ${w.trackUsage || 'Unknown'}`,
+          `# G61_FUEL_LEFT: ${w.fuel || 'Unknown'}`,
+          `# G61_SCRAPED_AT: ${new Date(w.scrapedAt || Date.now()).toISOString()}`
+        ];
+        metaComments = metaLines.join('\n') + '\n';
+        console.log(`[Weather] Attached weather conditions for: "${file}"`);
+      } catch (err) {
+        console.warn(`[Weather Warn] Failed to parse weather JSON for "${file}":`, err.message);
+      }
+    } else {
+      console.log(`[Weather Info] No weather JSON found for: "${file}"`);
+    }
+
+    // Read raw CSV data and prepend weather meta comments
+    const csvContent = fs.readFileSync(srcPath, 'utf8');
+    const finalCsvContent = metaComments + csvContent;
+    
+    // Copy/Write file to all specified target directories
     targetDirs.forEach(baseDir => {
       const destFolder = path.join(baseDir, trackSlug, carSlug);
       if (!fs.existsSync(destFolder)) {
         fs.mkdirSync(destFolder, { recursive: true });
       }
       const destPath = path.join(destFolder, targetFileName);
-      fs.copyFileSync(srcPath, destPath);
+      fs.writeFileSync(destPath, finalCsvContent, 'utf8');
     });
     
-    // Delete source file from Downloads to prevent duplicate imports and clean up
+    // Delete source files from Downloads to clean up
     fs.unlinkSync(srcPath);
+    if (fs.existsSync(weatherJsonPath)) {
+      fs.unlinkSync(weatherJsonPath);
+    }
     
-    console.log(`[✓] Moved: "${file}"`);
+    console.log(`[✓] Moved & Processed: "${file}"`);
     console.log(`    -> to: [extensions/data & src/data]/${trackSlug}/${carSlug}/${targetFileName}`);
     successCount++;
   } catch (err) {
@@ -81,5 +122,6 @@ telemetryFiles.forEach(file => {
 });
 
 console.log('------------------------------------------------');
-console.log(`SUCCESS: Imported and cleaned up ${successCount} telemetry CSV files.`);
-console.log('Telemetry files are now organized under extensions/data/ and src/data/ by track/car.');
+console.log(`SUCCESS: Imported and processed ${successCount} telemetry CSV files.`);
+console.log('Telemetry files (now with weather comments) are organized under extensions/data/ and src/data/ by track/car.');
+

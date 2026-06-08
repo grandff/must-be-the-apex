@@ -98,4 +98,82 @@ if (fs.existsSync(implFile)) {
   console.log('Warning: nan_implementation_12_inl.h not found.');
 }
 
+// 6. Patch better-sqlite3 helpers.cpp SetNativeDataProperty
+const helpersFileSqlite = path.join(projectRoot, 'node_modules', 'better-sqlite3', 'src', 'util', 'helpers.cpp');
+if (fs.existsSync(helpersFileSqlite)) {
+  let content = fs.readFileSync(helpersFileSqlite, 'utf8');
+  let updated = false;
+
+  // Use regex to replace 0 with nullptr inside SetNativeDataProperty argument list
+  const regex = /func,\s*0,\s*data/g;
+  if (regex.test(content)) {
+    content = content.replace(regex, (match) => match.replace('0', 'nullptr'));
+    updated = true;
+  }
+
+  if (updated) {
+    fs.writeFileSync(helpersFileSqlite, content, 'utf8');
+    console.log('Success: Patched better-sqlite3 helpers.cpp SetNativeDataProperty');
+  } else {
+    console.log('Info: better-sqlite3 helpers.cpp already patched or target not found. Skipping.');
+  }
+} else {
+  console.log('Warning: better-sqlite3 helpers.cpp not found.');
+}
+
+// 7. Patch better-sqlite3 macros.cpp OnlyAddon definition
+const macrosFileSqlite = path.join(projectRoot, 'node_modules', 'better-sqlite3', 'src', 'util', 'macros.cpp');
+if (fs.existsSync(macrosFileSqlite)) {
+  let content = fs.readFileSync(macrosFileSqlite, 'utf8');
+  let updated = false;
+
+  if (content.includes('info.Data().As<v8::External>()->Value()')) {
+    content = content.replace('#define OnlyAddon static_cast<Addon*>(info.Data().As<v8::External>()->Value())', 
+      '#ifdef V8_EXTERNAL_POINTER_TAG_COUNT\n#define OnlyAddon static_cast<Addon*>(info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault))\n#else\n#define OnlyAddon static_cast<Addon*>(info.Data().As<v8::External>()->Value())\n#endif'
+    );
+    // fallback for CRLF
+    content = content.replace('#define OnlyAddon static_cast<Addon*>(info.Data().As<v8::External>()->Value())\r', 
+      '#ifdef V8_EXTERNAL_POINTER_TAG_COUNT\r\n#define OnlyAddon static_cast<Addon*>(info.Data().As<v8::External>()->Value(v8::kExternalPointerTypeTagDefault))\r\n#else\r\n#define OnlyAddon static_cast<Addon*>(info.Data().As<v8::External>()->Value())\r\n#endif\r'
+    );
+    updated = true;
+  }
+
+  if (updated) {
+    fs.writeFileSync(macrosFileSqlite, content, 'utf8');
+    console.log('Success: Patched better-sqlite3 macros.cpp OnlyAddon definition');
+  } else {
+    console.log('Info: better-sqlite3 macros.cpp already patched or target not found. Skipping.');
+  }
+} else {
+  console.log('Warning: better-sqlite3 macros.cpp not found.');
+}
+
+// 8. Patch better-sqlite3 better_sqlite3.cpp External::New
+const mainFileSqlite = path.join(projectRoot, 'node_modules', 'better-sqlite3', 'src', 'better_sqlite3.cpp');
+if (fs.existsSync(mainFileSqlite)) {
+  let content = fs.readFileSync(mainFileSqlite, 'utf8');
+  let updated = false;
+
+  if (content.includes('v8::External::New(isolate, addon)')) {
+    content = content.replace('v8::Local<v8::External> data = v8::External::New(isolate, addon);',
+      '#ifdef V8_EXTERNAL_POINTER_TAG_COUNT\n\tv8::Local<v8::External> data = v8::External::New(isolate, addon, v8::kExternalPointerTypeTagDefault);\n#else\n\tv8::Local<v8::External> data = v8::External::New(isolate, addon);\n#endif'
+    );
+    // fallback for CRLF
+    content = content.replace('v8::Local<v8::External> data = v8::External::New(isolate, addon);\r',
+      '#ifdef V8_EXTERNAL_POINTER_TAG_COUNT\r\n\tv8::Local<v8::External> data = v8::External::New(isolate, addon, v8::kExternalPointerTypeTagDefault);\r\n#else\r\n\tv8::Local<v8::External> data = v8::External::New(isolate, addon);\r\n#endif\r'
+    );
+    updated = true;
+  }
+
+  if (updated) {
+    fs.writeFileSync(mainFileSqlite, content, 'utf8');
+    console.log('Success: Patched better-sqlite3 better_sqlite3.cpp External::New');
+  } else {
+    console.log('Info: better-sqlite3 better_sqlite3.cpp already patched or target not found. Skipping.');
+  }
+} else {
+  console.log('Warning: better-sqlite3 better_sqlite3.cpp not found.');
+}
+
 console.log('node-irsdk patcher finished.');
+

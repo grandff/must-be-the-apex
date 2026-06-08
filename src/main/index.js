@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -99,6 +99,11 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     
+    // Register global shortcut to toggle Edit Mode (CommandOrControl+Shift+O)
+    globalShortcut.register('CommandOrControl+Shift+O', () => {
+      toggleEditMode();
+    });
+    
     // Start tracking iRacing
     iracingClient = new IRacingClient();
     setupIRacingHandlers();
@@ -122,6 +127,21 @@ function createWindow() {
     }
     mainWindow = null;
   });
+}
+
+let isEditMode = false;
+function toggleEditMode() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  isEditMode = !isEditMode;
+  if (isEditMode) {
+    console.log('[Main] Edit Mode Activated: Enabling mouse events.');
+    mainWindow.setIgnoreMouseEvents(false);
+    mainWindow.webContents.send('toggle-edit-mode', true);
+  } else {
+    console.log('[Main] Edit Mode Deactivated: Disabling mouse events (click-through active).');
+    mainWindow.setIgnoreMouseEvents(true, { forwardToPanel: true });
+    mainWindow.webContents.send('toggle-edit-mode', false);
+  }
 }
 
 function setupIRacingHandlers() {
@@ -157,8 +177,8 @@ function setupIRacingHandlers() {
 
   // Listen to raw telemetry frames (60Hz)
   iracingClient.on('telemetry', (data) => {
-    // 1. Record frame to memory buffer (unthrottled 60Hz)
-    recorder.addFrame(data);
+    // 1. Record frame to memory buffer (unthrottled 60Hz) with current track and car context
+    recorder.addFrame(data, iracingClient.currentTrack, iracingClient.currentCar);
 
     // 2. Update real-time coaching state machine (60Hz)
     analyzer.updateTelemetry(data);
@@ -201,6 +221,24 @@ function setupAnalyzerHandlers() {
   analyzer.on('reference-missing', (data) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('reference-missing', data);
+    }
+  });
+
+  analyzer.on('reference-loaded', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('reference-loaded', data);
+    }
+  });
+
+  analyzer.on('upcoming-corner', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('upcoming-corner', data);
+    }
+  });
+
+  analyzer.on('target-upgraded', (data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('target-upgraded', data);
     }
   });
 }
@@ -258,6 +296,18 @@ app.on('window-all-closed', () => {
   }
 });
 
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+});
+
 app.on('quit', () => {
   dbManager.closeDatabase();
+});
+
+// Bind IPC to change click-through status dynamically
+ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) {
+    win.setIgnoreMouseEvents(ignore, options);
+  }
 });
