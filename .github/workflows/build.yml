@@ -27,9 +27,6 @@ jobs:
       - name: Patch node-irsdk C++ files (BOM and AtExit signature)
         run: node scripts/patch-node-irsdk.js
 
-      - name: Rebuild Native Modules
-        run: npm rebuild
-
       - name: Build and Package Electron App
         run: npm run dist -- --publish never
         env:

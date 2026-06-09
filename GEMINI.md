@@ -4,6 +4,12 @@
 
 ---
 
+## ⚠️ 개발자 주의 사항 및 운영 규칙 (Critical Rules for AI Developer)
+* **릴리즈 태그 전송 제한 (`tag-push.sh`)**:
+  > [!IMPORTANT]
+  > **`tag-push.sh` 스크립트 실행 및 git tag 생성/푸시는 무조건 사용자(USER)만 수행합니다.** AI 어시스턴트는 절대로 `./tag-push.sh`를 임의로 구동하거나 깃허브에 직접 tag를 push해서는 안 됩니다. 릴리즈 배포가 필요할 경우 사용자에게 실행을 정중히 요청하십시오.
+---
+
 ## 1. 디렉토리 구조 (Directory Structure)
 
 일렉트론(Electron) 메인 프로세스와 렌더러 프로세스를 완전히 분리하고, 데이터 연산 코어를 독립된 모듈로 관리합니다.
